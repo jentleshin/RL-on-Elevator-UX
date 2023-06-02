@@ -10,6 +10,7 @@ STEP_REWARD=-0.1
 FLOOR_RANGE=0.1
 STOP_VEL_RANGE=0.1
 REWARD_SUCCESS=10
+ACCEL_THRESHOLD=5
 
 class Passenger():
     def __init__(self, origin,dest):
@@ -36,16 +37,20 @@ class PassengerEnv():
         self.passengers=list(Passenger)
         for i in range(len(passenger_state)):
             self.passengers.append(Passenger(passenger_state[i][0],passenger_state[i][1]))
+    
     def num_on_board(self):
         num=0
         for i in range(len(self.passengers)):
             if self.passengers[i].board() is True:
                 num+=1
         return num
+    
     def check_arrival(self):
         num=0
         i=0
         while True:
+            if not self.passengers:
+                break
             if i>len(self.passengers):
                 break
             if self.passengers[i].arrival is True:
@@ -54,6 +59,7 @@ class PassengerEnv():
             else:
                 i+=1
         return num
+    
     def on_off_board(self,floor):
         for i in range(len(self.passengers)):
             if self.passengers[i].board()==True:
@@ -112,14 +118,25 @@ class ElevatorEnv(gym.Env):
         else:
             return -1
 
-
+    def accel_relu(self,action):
+        if abs(action)>ACCEL_THRESHOLD:
+            return ACCEL_THRESHOLD-abs(action)
+        else:
+            return 0
+        
     def compute_reward(self,state,action,next_state):
-        reward=STEP_REWARD+self.passenger_status.check_arrival()*REWARD_SUCCESS
+        reward=self.accel_relu(action)
+        reward+=STEP_REWARD+self.passenger_status.check_arrival()*REWARD_SUCCESS
         return reward
+    
     def is_done(self,state,action,next_state):
+        if self.passenger_status.passengers:
+            self.done=True
         return self.done
+    
     def render(self):
         return super().render()
+    
     def reset(self):
     # 환경 초기화
         self.done=False
@@ -137,15 +154,12 @@ class ElevatorEnv(gym.Env):
         curr_floor=self.check_floor(prev_state,action,next_state)
         if curr_floor!=-1:
             self.passenger_status.on_off_board(curr_floor)
-        
 
-
-        self.observation=next_state
         reward=self.compute_reward(prev_state,action,next_state)
-        self.done=self.is_done(prev_state,action,next_state)
-             
 
-        
+        self.observation=next_state        
+        self.done=self.is_done(prev_state,action,next_state)
+                
         return (self.observation,reward,self.done)
 
 
