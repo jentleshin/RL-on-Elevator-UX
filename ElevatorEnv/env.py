@@ -1,6 +1,6 @@
 from typing import List, Optional, Union
-import gym
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 import numpy as np
 import pygame
 
@@ -38,14 +38,14 @@ class Passenger():
 
 class PassengerEnv():
     def __init__(self,passenger_state=[(3,1),(2,1)]):
-        self.passengers=list(Passenger)
+        self.passengers=list()
         for i in range(len(passenger_state)):
             self.passengers.append(Passenger(passenger_state[i][0],passenger_state[i][1]))
     
-    def buttonsPushed(self):
-        buttons=np.zeros(len(self.passengers))
+    def buttonsPushed(self,tot_floor):
+        buttons=np.zeros(tot_floor)
         for i in range(len(self.passengers)):
-            buttons[self.passengers[i].origin]=1
+            buttons[self.passengers[i].origin-1]=1
         return buttons
 
     def num_on_board(self):
@@ -86,7 +86,7 @@ class PassengerEnv():
 
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    def __init__(self, render_mode='rgb_array',tot_floor=3,
+    def __init__(self, render_mode='human',tot_floor=3,
                  passenger_status=PassengerEnv(),passenger_mode='determined'):
         """
         An initialization function
@@ -114,7 +114,7 @@ class ElevatorEnv(gym.Env):
         self.tot_floor=tot_floor
     
         if passenger_mode=='determined':
-            self.start_state = dict({"buttonsOut":passenger_status.buttonsPushed(),
+            self.start_state = dict({"buttonsOut":passenger_status.buttonsPushed(tot_floor),
                                  "buttonsIn":np.zeros(tot_floor),
                                  "location":0.0,
                                  "velocity":0.0})
