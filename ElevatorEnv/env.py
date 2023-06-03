@@ -37,15 +37,15 @@ class Passenger():
 
 
 class PassengerEnv():
-    def __init__(self,passenger_state=[(3,1),(2,1)]):
+    def __init__(self,passenger_state=[(2,0),(1,0)]):
         self.passengers=list()
         for i in range(len(passenger_state)):
             self.passengers.append(Passenger(passenger_state[i][0],passenger_state[i][1]))
     
     def buttonsPushed(self,tot_floor):
-        buttons=np.zeros(tot_floor)
+        buttons=np.zeros(tot_floor,dtype=int)
         for i in range(len(self.passengers)):
-            buttons[self.passengers[i].origin-1]=1
+            buttons[self.passengers[i].origin]=1
         return buttons
 
     def num_on_board(self):
@@ -58,14 +58,11 @@ class PassengerEnv():
     def check_arrival(self):
         num=0
         i=0
-        while True:
+        for i in range(len(self.passengers)):
             if not self.passengers:
-                break
-            if i>=len(self.passengers):
-                break
+               return -1
             if self.passengers[i].arrival is True:
                 num+=1
-                self.passengers.pop(i)
             else:
                 i+=1
         return num
@@ -112,16 +109,19 @@ class ElevatorEnv(gym.Env):
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
         self.passenger_status=passenger_status
         self.tot_floor=tot_floor
+        self.passenger_arrived=0
     
         if passenger_mode=='determined':
             self.start_state = dict({"buttonsOut":passenger_status.buttonsPushed(tot_floor),
-                                 "buttonsIn":np.zeros(tot_floor),
+                                 "buttonsIn":np.zeros(tot_floor,dtype=int),
                                  "location":0.0,
                                  "velocity":0.0})
         self.terminal_state = 0
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
+        pygame.font.init()
+        self.font=pygame.font.Font('freesansbold.ttf',100)
 
         """
         If human-rendering is used, `self.window` will be a reference
@@ -157,12 +157,14 @@ class ElevatorEnv(gym.Env):
             return 0
         
     def compute_reward(self,state,action,next_state):
+        arrival=self.passenger_status.check_arrival()
         reward=self.accel_relu(action)
-        reward+=STEP_REWARD+self.passenger_status.check_arrival()*REWARD_SUCCESS
+        reward+=STEP_REWARD+(arrival-self.passenger_arrived)*REWARD_SUCCESS
+        self.passenger_arrived=arrival
         return reward
     
     def is_done(self,state,action,next_state):
-        if not self.passenger_status.passengers:
+        if self.passenger_arrived==len(self.passenger_status.passengers):
             self.done=True
         return self.done
     
@@ -171,6 +173,7 @@ class ElevatorEnv(gym.Env):
             return self._render_frame()
 
     def _render_frame(self):
+        color=[(0,0,0),(0,255,0)]
         elevator_width=40
         elevator_height=0
         if self.window is None and self.render_mode == "human":
@@ -209,6 +212,19 @@ class ElevatorEnv(gym.Env):
                 (self.window_size/2,(i+0.5)*pix_square_size),
                 20,
             )
+            pygame.draw.circle(
+                canvas,
+                color[self.observation['buttonsIn'][i]],
+                (self.window_size -100,self.window_size-(i+0.5)*pix_square_size),
+                20,
+            )
+            pygame.draw.circle(
+                canvas,
+                color[self.observation['buttonsOut'][i]],
+                (100,self.window_size-(i+0.5)*pix_square_size),
+                20,
+            )
+
         pygame.draw.rect(
             canvas,
             (255, 0, 0),
@@ -217,16 +233,29 @@ class ElevatorEnv(gym.Env):
                 (elevator_width, elevator_height),
             ),
         )
-
+        num_arrived=0
         # Now we draw the agent
         for i in range(len(self.passenger_status.passengers)):
-            if self.passenger_status.passengers[i].on_board is False:
+            if self.passenger_status.passengers[i].arrival is True:
+                pygame.draw.circle(
+                    canvas,
+                    (255, 0, 0),
+                    (self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size ),
+                    20,
+                )
+            elif self.passenger_status.passengers[i].on_board is False:
                 pygame.draw.circle(
                     canvas,
                     (0, 0, 255),
                     (self.window_size/2 -100 ,(i+0.5)*pix_square_size ),
                     20,
                 )
+
+        text=self.font.render(str(round(self.observation['location'],2)),True,(0,0,0),(255,255,255))
+        textRect=text.get_rect()
+        textRect.center=(150,80)
+        canvas.blit(text,textRect)
+
             
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window
@@ -250,6 +279,7 @@ class ElevatorEnv(gym.Env):
         
     def step(self, action):
     # 주어진 동작을 위치로 마크를 배치
+    # elevator 1층, 최상층 범위 벗어나려 할때 reward needed
         truncated=False
         buttonsIn=None
         prev_state=self.observation
