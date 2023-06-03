@@ -19,17 +19,20 @@ class Passenger():
 
         Parameters
         ----------
-        size: a list of integers
-            the dimension of 2D grid environment
-        start: integer
-            start state (i.e., location)
+        origin: origin of passenger
 
+        dest: destination of passenger
+
+        on_board: boolean
+            whether the passenger is on board the elevator
+        arrival: boolean
+            whether the passenger arrived the destination
+            
         """
         self.origin=origin
         self.dest=dest
         self.on_board=False
         self.arrival=False
-
 
 
 class PassengerEnv():
@@ -38,6 +41,12 @@ class PassengerEnv():
         for i in range(len(passenger_state)):
             self.passengers.append(Passenger(passenger_state[i][0],passenger_state[i][1]))
     
+    def buttonsPushed(self):
+        buttons=np.zeros(len(self.passengers))
+        for i in range(len(self.passengers)):
+            buttons[self.passengers[i].origin]=1
+        return buttons
+
     def num_on_board(self):
         num=0
         for i in range(len(self.passengers)):
@@ -61,17 +70,23 @@ class PassengerEnv():
         return num
     
     def on_off_board(self,floor):
+        buttonsIn=list(int)
         for i in range(len(self.passengers)):
             if self.passengers[i].board()==True:
                 if self.passengers[i].dest==floor:
                     self.passengers[i].arrival=True
                     self.passengers[i].on_board=False
+
             if self.passengers[i].origin==floor:
                 self.passengers[i].on_board=True
+                buttonsIn.append(self.passengers[i].dest)
+        
+        return buttonsIn
 
 class ElevatorEnv(gym.Env):
     metadata = {'render.modes': ['human']} # 렌더링 모드
-    def __init__(self, render_mode='rgb_array',tot_floor=3,passenger_status=PassengerEnv()):
+    def __init__(self, render_mode='rgb_array',tot_floor=3,
+                 passenger_status=PassengerEnv(),passenger_mode='determined'):
         """
         An initialization function
 
@@ -97,7 +112,8 @@ class ElevatorEnv(gym.Env):
         self.passenger_status=passenger_status
         self.tot_floor=tot_floor
     
-        self.start_state = dict({"buttonsOut":np.zeros(tot_floor),
+        if passenger_mode=='determined':
+            self.start_state = dict({"buttonsOut":passenger_status.buttonsPushed(),
                                  "buttonsIn":np.zeros(tot_floor),
                                  "location":0.0,
                                  "velocity":0.0})
@@ -145,6 +161,7 @@ class ElevatorEnv(gym.Env):
         
     def step(self, action):
     # 주어진 동작을 위치로 마크를 배치
+        buttonsIn=None
         prev_state=self.observation
         next_state=prev_state.copy()
 
@@ -153,7 +170,11 @@ class ElevatorEnv(gym.Env):
 
         curr_floor=self.check_floor(prev_state,action,next_state)
         if curr_floor!=-1:
-            self.passenger_status.on_off_board(curr_floor)
+            buttonsIn=self.passenger_status.on_off_board(curr_floor)
+            if buttonsIn!=None:
+                for i in range(len(buttonsIn)):
+                    next_state['buttonsOut'][buttonsIn[i]]=0
+                    next_state['buttonsIn'][buttonsIn[i]]=1
 
         reward=self.compute_reward(prev_state,action,next_state)
 
