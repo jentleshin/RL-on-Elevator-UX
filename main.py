@@ -3,11 +3,13 @@ import sys
 #import torch
 import gymnasium as gym
 import ElevatorEnv
+from ElevatorEnv.eval_policy import eval_policy
 import matplotlib.pyplot as plt
+import numpy as np
 
 from PPO.ppo import PPO
 from PPO.network import FeedForwardNN
-from PPO.eval_policy import eval_policy
+#from PPO.eval_policy import eval_policy
 
 
 # def train(env, hyperparameters, actor_model, critic_model):
@@ -79,7 +81,8 @@ from PPO.eval_policy import eval_policy
 # 	eval_policy(policy=policy, env=env, render=True)
 
 
-
+def dummy_policy(state):
+    return np.random.rand(1)*20.0 -10.0
 
 
 def main(args):
@@ -116,8 +119,10 @@ def main(args):
 	print(obs_dim)
 	print(act_dim)
 	env.reset()
-	plt.imshow(env.render())
-	plt.show()
+	eval_policy(env,dummy_policy,10)
+	# plt.imshow(env.render())
+	# plt.show()
+    
 	
 	# Train or test, depending on the mode specified
 	# if args.mode == 'train':
