@@ -108,12 +108,16 @@ def main(args):
 	# observation and action spaces.
 
 	env = gym.make('Elevator-v0')
-
+	obs_dim = env.observation_space.shape[0]
+	act_dim = env.action_space.shape[0]
+	print(obs_dim)
+	print(act_dim)
+	env.render()
 	# Train or test, depending on the mode specified
-	if args.mode == 'train':
-		train(env=env, hyperparameters=hyperparameters, actor_model=args.actor_model, critic_model=args.critic_model)
-	else:
-		test(env=env, actor_model=args.actor_model)
+	# if args.mode == 'train':
+	# 	train(env=env, hyperparameters=hyperparameters, actor_model=args.actor_model, critic_model=args.critic_model)
+	# else:
+	# 	test(env=env, actor_model=args.actor_model)
 
 if __name__ == '__main__':
 	

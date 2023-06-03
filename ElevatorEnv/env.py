@@ -2,8 +2,9 @@ from typing import List, Optional, Union
 import gym
 from gym import spaces
 import numpy as np
+import pygame
 
-FLOOR_HIGHT=3.0
+FLOOR_HEIGHT=3.0
 MAX_VELOCITY=100.0
 DELTA_T=0.1
 STEP_REWARD=-0.1
@@ -84,7 +85,7 @@ class PassengerEnv():
         return buttonsIn
 
 class ElevatorEnv(gym.Env):
-    metadata = {'render.modes': ['human']} # 렌더링 모드
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
     def __init__(self, render_mode='rgb_array',tot_floor=3,
                  passenger_status=PassengerEnv(),passenger_mode='determined'):
         """
@@ -106,7 +107,7 @@ class ElevatorEnv(gym.Env):
         ''' set observation space and action space '''
         self.observation_space = spaces.Dict({"buttonsOut":spaces.MultiBinary(tot_floor),
                             "buttonsIn":spaces.MultiBinary(tot_floor),
-                            "location":spaces.Box(low=0,high=FLOOR_HIGHT*tot_floor),
+                            "location":spaces.Box(low=0,high=FLOOR_HEIGHT*tot_floor),
                             "velocity":spaces.Box(low=-MAX_VELOCITY,high=MAX_VELOCITY)})
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
         self.passenger_status=passenger_status
@@ -118,6 +119,21 @@ class ElevatorEnv(gym.Env):
                                  "location":0.0,
                                  "velocity":0.0})
         self.terminal_state = 0
+
+        assert render_mode is None or render_mode in self.metadata["render_modes"]
+        self.render_mode = render_mode
+
+        """
+        If human-rendering is used, `self.window` will be a reference
+        to the window that we draw to. `self.clock` will be a clock that is used
+        to ensure that the environment is rendered at the correct framerate in
+        human-mode. They will remain `None` until human-mode is used for the
+        first time.
+        """
+        self.window_size=900
+        self.window = None
+        self.clock = None
+
 
     def probability_function(self,state):
         return False
@@ -151,7 +167,82 @@ class ElevatorEnv(gym.Env):
         return self.done
     
     def render(self):
-        return super().render()
+        if self.render_mode == "rgb_array":
+            return self._render_frame()
+
+    def _render_frame(self):
+        elevator_width=50
+        elevator_height=0
+        if self.window is None and self.render_mode == "human":
+            pygame.init()
+            pygame.display.init()
+            self.window = pygame.display.set_mode((self.window_size, self.window_size))
+        if self.clock is None and self.render_mode == "human":
+            self.clock = pygame.time.Clock()
+
+        canvas = pygame.Surface((self.window_size, self.window_size))
+        canvas.fill((255, 255, 255))
+        pix_square_size = (
+            self.window_size / self.tot_floor
+        )  # The size of a single grid square in pixels
+        elevator_height=pix_square_size/2
+        floor_pixel_size=(self.window_size-pix_square_size)/(self.tot_floor-1)
+        # First we draw the target
+        for i in range(self.tot_floor):
+            pygame.draw.circle(
+                canvas,
+                (0, 0, 255),
+                (self.window_size/2,(i+0.5)*pix_square_size),
+                pix_square_size / 3,
+            )
+            if i!=self.tot_floor-1:
+                pygame.draw.line(
+                    canvas,
+                    (0, 0, 255),
+                    (self.window_size/2,(i+0.5)*pix_square_size),
+                    (self.window_size/2,(i+1.5)*pix_square_size),
+                    width=3,
+                )
+            pygame.draw.circle(
+                canvas,
+                (255, 255, 255),
+                (self.window_size/2,(i+0.5)*pix_square_size),
+                pix_square_size / 5,
+            )
+
+        pygame.draw.rect(
+            canvas,
+            (255, 0, 0),
+            pygame.Rect(
+                (self.window_size/2-elevator_width/2,
+                 self.window_size-pix_square_size/2-self.observation['location']/FLOOR_HEIGHT*floor_pixel_size-elevator_height),
+                (elevator_width, elevator_height),
+            ),
+        )
+
+        # Now we draw the agent
+        for i in range(len(self.passenger_status.passengers)):
+            if self.passenger_status.passengers[i].on_board is False:
+                pygame.draw.circle(
+                    canvas,
+                    (0, 0, 255),
+                    (self.window_size/2 -50 ,(i+0.5)*pix_square_size ),
+                    pix_square_size / 5,
+                )
+            
+        if self.render_mode == "human":
+            # The following line copies our drawings from `canvas` to the visible window
+            self.window.blit(canvas, canvas.get_rect())
+            pygame.event.pump()
+            pygame.display.update()
+
+            # We need to ensure that human-rendering occurs at the predefined framerate.
+            # The following line will automatically add a delay to keep the framerate stable.
+            self.clock.tick(self.metadata["render_fps"])
+        else:  # rgb_array
+            return np.transpose(
+                np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
+            )
     
     def reset(self):
     # 환경 초기화
@@ -182,7 +273,10 @@ class ElevatorEnv(gym.Env):
         self.done=self.is_done(prev_state,action,next_state)
                 
         return (self.observation,reward,self.done)
-
+    def close(self):
+        if self.window is not None:
+            pygame.display.quit()
+            pygame.quit()
 
 
 
