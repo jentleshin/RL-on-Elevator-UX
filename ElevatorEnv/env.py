@@ -171,7 +171,7 @@ class ElevatorEnv(gym.Env):
             return self._render_frame()
 
     def _render_frame(self):
-        elevator_width=50
+        elevator_width=40
         elevator_height=0
         if self.window is None and self.render_mode == "human":
             pygame.init()
@@ -185,7 +185,7 @@ class ElevatorEnv(gym.Env):
         pix_square_size = (
             self.window_size / self.tot_floor
         )  # The size of a single grid square in pixels
-        elevator_height=pix_square_size/2
+        elevator_height=pix_square_size/3
         floor_pixel_size=(self.window_size-pix_square_size)/(self.tot_floor-1)
         # First we draw the target
         for i in range(self.tot_floor):
@@ -193,7 +193,7 @@ class ElevatorEnv(gym.Env):
                 canvas,
                 (0, 0, 255),
                 (self.window_size/2,(i+0.5)*pix_square_size),
-                pix_square_size / 3,
+                40,
             )
             if i!=self.tot_floor-1:
                 pygame.draw.line(
@@ -201,13 +201,13 @@ class ElevatorEnv(gym.Env):
                     (0, 0, 255),
                     (self.window_size/2,(i+0.5)*pix_square_size),
                     (self.window_size/2,(i+1.5)*pix_square_size),
-                    width=3,
+                    width=10,
                 )
             pygame.draw.circle(
                 canvas,
                 (255, 255, 255),
                 (self.window_size/2,(i+0.5)*pix_square_size),
-                pix_square_size / 5,
+                20,
             )
 
         pygame.draw.rect(
@@ -226,8 +226,8 @@ class ElevatorEnv(gym.Env):
                 pygame.draw.circle(
                     canvas,
                     (0, 0, 255),
-                    (self.window_size/2 -50 ,(i+0.5)*pix_square_size ),
-                    pix_square_size / 5,
+                    (self.window_size/2 -100 ,(i+0.5)*pix_square_size ),
+                    20,
                 )
             
         if self.render_mode == "human":
