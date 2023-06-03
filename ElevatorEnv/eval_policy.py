@@ -7,8 +7,6 @@ def save_video_of_model(env_name, model=None, suffix="", num_episodes=10):
     Record a video that shows the behavior of an agent following a model 
     (i.e., policy) on the input environment
     """
-    display = Display(visible=0, size=(400, 300))
-    display.start()
 
     env = gym.make(env_name)
     obs= env.reset()
@@ -25,7 +23,7 @@ def save_video_of_model(env_name, model=None, suffix="", num_episodes=10):
         frame = env.render()
         output_video.writeFrame(frame)
 
-        if "Gridworld" in env_name:
+        if "Elevator" in env_name:
             input_obs = obs
         else:
             raise ValueError(f"Unknown env for saving: {env_name}")
@@ -42,12 +40,12 @@ def save_video_of_model(env_name, model=None, suffix="", num_episodes=10):
         returns += reward
         if done or truncated:
             num_runs += 1
-            obs, _ = env.reset()
+            obs= env.reset()
 
     output_video.close()
     print("Successfully saved {} frames into {}!".format(counter, filename))
     return filename, returns / num_runs
 
-def eval_policy(self,env,policy,episodes):
-    _,rew=save_video_of_model(env,policy,num_episodes=episodes)
+def eval_policy(env_name,policy,episodes):
+    _,rew=save_video_of_model(env_name,policy,num_episodes=episodes)
     print(rew)

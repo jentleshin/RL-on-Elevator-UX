@@ -82,7 +82,7 @@ from PPO.network import FeedForwardNN
 
 
 def dummy_policy(state):
-    return np.random.rand(1)*20.0 -10.0
+    return np.random.rand(1).item()*20.0 -10.0
 
 
 def main(args):
@@ -119,9 +119,10 @@ def main(args):
 	print(obs_dim)
 	print(act_dim)
 	env.reset()
-	eval_policy(env,dummy_policy,10)
-	# plt.imshow(env.render())
-	# plt.show()
+	plt.imshow(env.render())
+	plt.show()
+	eval_policy('Elevator-v0',policy=dummy_policy,episodes=10)
+	
     
 	
 	# Train or test, depending on the mode specified

@@ -61,7 +61,7 @@ class PassengerEnv():
         while True:
             if not self.passengers:
                 break
-            if i>len(self.passengers):
+            if i>=len(self.passengers):
                 break
             if self.passengers[i].arrival is True:
                 num+=1
@@ -71,9 +71,9 @@ class PassengerEnv():
         return num
     
     def on_off_board(self,floor):
-        buttonsIn=list(int)
+        buttonsIn=list()
         for i in range(len(self.passengers)):
-            if self.passengers[i].board()==True:
+            if self.passengers[i].on_board==True:
                 if self.passengers[i].dest==floor:
                     self.passengers[i].arrival=True
                     self.passengers[i].on_board=False
@@ -162,7 +162,7 @@ class ElevatorEnv(gym.Env):
         return reward
     
     def is_done(self,state,action,next_state):
-        if self.passenger_status.passengers:
+        if not self.passenger_status.passengers:
             self.done=True
         return self.done
     
@@ -209,13 +209,11 @@ class ElevatorEnv(gym.Env):
                 (self.window_size/2,(i+0.5)*pix_square_size),
                 20,
             )
-
         pygame.draw.rect(
             canvas,
             (255, 0, 0),
             pygame.Rect(
-                (self.window_size/2-elevator_width/2,
-                 self.window_size-pix_square_size/2-self.observation['location']/FLOOR_HEIGHT*floor_pixel_size-elevator_height),
+                (self.window_size/2-elevator_width/2,self.window_size-pix_square_size/2-self.observation['location']/FLOOR_HEIGHT*floor_pixel_size-elevator_height),
                 (elevator_width, elevator_height),
             ),
         )
@@ -252,12 +250,23 @@ class ElevatorEnv(gym.Env):
         
     def step(self, action):
     # 주어진 동작을 위치로 마크를 배치
+        truncated=False
         buttonsIn=None
         prev_state=self.observation
         next_state=prev_state.copy()
+        if prev_state['location']==0:
+            if action<0:
+                action=0
+        if prev_state['location']==FLOOR_HEIGHT*(self.tot_floor-1):
+            if action>0:
+                action=0
 
-        next_state['location']+=next_state['velocity']*DELTA_T+0.5*action*pow(DELTA_T,2)
+        next_state['location']+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
+        if next_state['location']<0:
+            next_state['location']=0
+        if next_state['location']>FLOOR_HEIGHT*(self.tot_floor-1):
+            next_state['location']=FLOOR_HEIGHT*(self.tot_floor-1)
 
         curr_floor=self.check_floor(prev_state,action,next_state)
         if curr_floor!=-1:
@@ -272,7 +281,7 @@ class ElevatorEnv(gym.Env):
         self.observation=next_state        
         self.done=self.is_done(prev_state,action,next_state)
                 
-        return (self.observation,reward,self.done)
+        return (self.observation,reward,self.done,truncated,{"info":0})
     def close(self):
         if self.window is not None:
             pygame.display.quit()
