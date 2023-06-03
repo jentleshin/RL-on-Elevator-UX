@@ -86,7 +86,7 @@ class PassengerEnv():
 
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    def __init__(self, render_mode='human',tot_floor=3,
+    def __init__(self, render_mode="rgb_array",tot_floor=3,
                  passenger_status=PassengerEnv(),passenger_mode='determined'):
         """
         An initialization function

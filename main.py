@@ -3,10 +3,12 @@ import sys
 #import torch
 import gymnasium as gym
 import ElevatorEnv
+import matplotlib.pyplot as plt
 
 from PPO.ppo import PPO
 from PPO.network import FeedForwardNN
 from PPO.eval_policy import eval_policy
+
 
 # def train(env, hyperparameters, actor_model, critic_model):
 # 	"""
@@ -114,7 +116,9 @@ def main(args):
 	print(obs_dim)
 	print(act_dim)
 	env.reset()
-	env.render()
+	plt.imshow(env.render())
+	plt.show()
+	
 	# Train or test, depending on the mode specified
 	# if args.mode == 'train':
 	# 	train(env=env, hyperparameters=hyperparameters, actor_model=args.actor_model, critic_model=args.critic_model)
