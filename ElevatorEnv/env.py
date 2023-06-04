@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+import copy
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
@@ -162,6 +162,7 @@ class ElevatorEnv(gym.Env):
     def compute_reward(self, prev_state, action, next_state):
         reward_arg = self.passengerEnv.get_current_arrival()
         reward=self.accel_relu(action)+STEP_REWARD+(reward_arg)*REWARD_SUCCESS
+        #reward=self.accel_relu(action)+(reward_arg)*REWARD_SUCCESS
         self.passengerEnv.reset_current_arrival()
         return reward
     
@@ -281,7 +282,7 @@ class ElevatorEnv(gym.Env):
         truncated=False
         
         prev_state=self.observation
-        next_state=prev_state.copy()
+        next_state=copy.deepcopy(prev_state)
         next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
         next_state["location"], next_state["velocity"] = self.clip(next_state["location"], next_state["velocity"])
