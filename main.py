@@ -14,17 +14,17 @@ def main(args):
         vec_env = make_vec_env('Elevator-v0', n_envs=8)
         model = PPO('MultiInputPolicy', vec_env, verbose=1)
         model.learn(total_timesteps=args.timesteps)
-        model.save(args.path)
+        model.save(f"./checkpoint/{args.checkpoint}")
         print("Successfully saved trained model!")
         return
 
     elif args.mode == "test":
 
-        model = PPO.load(args.path)
+        model = PPO.load(f"./checkpoint/{args.checkpoint}")
         vec_env = make_vec_env('Elevator-v0', n_envs=1)
         obs = vec_env.reset()
 
-        output_video = skvideo.io.FFmpegWriter(args.filename)
+        output_video = skvideo.io.FFmpegWriter(f"./video/{args.filename}.mp4")
         counter=0
         num_runs=0
         while num_runs < args.num_episodes:
@@ -51,13 +51,13 @@ if __name__ == "__main__":
     # Subparser for the "train" mode
     train_parser = subparsers.add_parser("train")
     train_parser.add_argument("--timesteps", type=int, default=250000)
-    train_parser.add_argument("--path", type=str, default="./checkpoint/recent")
+    train_parser.add_argument("--checkpoint", type=str, default="recent")
 
     # Subparser for the "test" mode
     test_parser = subparsers.add_parser("test")
     test_parser.add_argument("--num_episodes", type=int, default=10)
-    test_parser.add_argument("--path", type=str, default="./checkpoint/recent")
-    test_parser.add_argument("--filename", type=str, default="./video/recent.mp4")
+    test_parser.add_argument("--checkpoint", type=str, default="recent")
+    test_parser.add_argument("--filename", type=str, default="recent")
 
     args = parser.parse_args()
     main(args)
