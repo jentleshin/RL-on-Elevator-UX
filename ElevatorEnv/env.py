@@ -275,7 +275,6 @@ class ElevatorEnv(gym.Env):
         self.done=False
         self.passengerEnv.reset()
         self.observation=self.start_state
-        print(self.observation['location'])
         return self.observation,{"info":None}
         
     def step(self, action):
