@@ -72,7 +72,7 @@ class PassengerEnv():
             self.onboarding[passenger.dest].append(passenger)
         self.waiting[floor]=[]
 
-        self.num_arrival = len(self.onboarding[floor])
+        self.current_arrival = len(self.onboarding[floor])
         for passenger in self.onboarding[floor]:
             passenger.state = State.ARRIVAL
             self.arrived[floor].append(passenger)
