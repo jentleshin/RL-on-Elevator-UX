@@ -7,6 +7,7 @@ import ElevatorEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 
+import matplotlib.pyplot as plt
 
 def main(args):
     
@@ -14,12 +15,18 @@ def main(args):
         vec_env = make_vec_env('Elevator-v0', n_envs=8)
         model = PPO('MultiInputPolicy', vec_env, verbose=1)
         model.learn(total_timesteps=args.timesteps)
-        model.save(f"./checkpoint/{args.checkpoint}")
+        model.save(args.path)
         print("Successfully saved trained model!")
         return
 
     elif args.mode == "test":
-        model = PPO.load(f"./checkpoint/{args.checkpoint}")
+        # env=gym.make('Elevator-v0')
+        # env.reset()
+        # plt.imshow(env.render())
+        # plt.show()
+
+
+        model = PPO.load(args.path)
         vec_env = make_vec_env('Elevator-v0', n_envs=1)
         obs = vec_env.reset()
 
@@ -36,6 +43,7 @@ def main(args):
             if done:
                 obs = vec_env.reset()
                 num_runs += 1
+
         print("Successfully saved {} frames into {}!".format(counter, args.filename))
 
 
@@ -49,12 +57,12 @@ if __name__ == "__main__":
     # Subparser for the "train" mode
     train_parser = subparsers.add_parser("train")
     train_parser.add_argument("--timesteps", type=int, default=250000)
-    train_parser.add_argument("--checkpoint", type=str, default="recent")
+    train_parser.add_argument("--path", type=str, default="./checkpoint/recent")
 
     # Subparser for the "test" mode
     test_parser = subparsers.add_parser("test")
     test_parser.add_argument("--num_episodes", type=int, default=10)
-    test_parser.add_argument("--checkpoint", type=str, default="recent")
+    test_parser.add_argument("--path", type=str, default="./checkpoint/recent")
     test_parser.add_argument("--filename", type=str, default="recent")
 
     args = parser.parse_args()

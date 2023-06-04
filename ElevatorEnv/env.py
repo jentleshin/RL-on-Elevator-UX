@@ -105,6 +105,7 @@ class ElevatorEnv(gym.Env):
             "velocity":spaces.Box(low=-MAX_VELOCITY,high=MAX_VELOCITY)
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
+        self.reward=0
         
         self.tot_floor=tot_floor
         self.passengerEnv=PassengerEnv(self.tot_floor)
@@ -120,7 +121,7 @@ class ElevatorEnv(gym.Env):
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
         pygame.font.init()
-        self.font=pygame.font.Font('freesansbold.ttf',100)
+        self.font=pygame.font.Font('freesansbold.ttf',40)
 
         """
         If human-rendering is used, `self.window` will be a reference
@@ -163,6 +164,7 @@ class ElevatorEnv(gym.Env):
     def compute_reward(self, prev_state, action, next_state):
         reward_arg = self.passengerEnv.get_current_arrival()
         reward=self.accel_relu(action)+STEP_REWARD+(reward_arg)*REWARD_SUCCESS
+        
         #reward=self.accel_relu(action)+(reward_arg)*REWARD_SUCCESS
         self.passengerEnv.reset_current_arrival()
         return reward
@@ -173,8 +175,7 @@ class ElevatorEnv(gym.Env):
 
     def _render_frame(self):
         color=[(0,0,0),(0,255,0)]
-        elevator_width=40
-        elevator_height=0
+
         if self.window is None and self.render_mode == "human":
             pygame.init()
             pygame.display.init()
@@ -188,15 +189,26 @@ class ElevatorEnv(gym.Env):
             self.window_size / self.tot_floor
         )  # The size of a single grid square in pixels
         elevator_height=pix_square_size/3
+        elevator_width=elevator_height/2
+
         floor_pixel_size=(self.window_size-pix_square_size)/(self.tot_floor-1)
+        borderLine_thickness=floor_pixel_size/FLOOR_HEIGHT*FLOOR_RANGE
         # First we draw the target
         for i in range(self.tot_floor):
-            pygame.draw.circle(
+            pygame.draw.rect(
                 canvas,
-                (0, 0, 255),
-                (self.window_size/2,(i+0.5)*pix_square_size),
-                40,
+                (0,0,255),
+                pygame.Rect(
+                    (self.window_size/2-(elevator_width+2*borderLine_thickness)/2,(i+0.5)*pix_square_size-(elevator_height+2*borderLine_thickness)/2),
+                    (elevator_width+2*borderLine_thickness,elevator_height+2*borderLine_thickness)
+                )
             )
+            # pygame.draw.circle(
+            #     canvas,
+            #     (0, 0, 255),
+            #     (self.window_size/2,(i+0.5)*pix_square_size),
+            #     40,
+            # )
             if i!=self.tot_floor-1:
                 pygame.draw.line(
                     canvas,
@@ -205,12 +217,21 @@ class ElevatorEnv(gym.Env):
                     (self.window_size/2,(i+1.5)*pix_square_size),
                     width=10,
                 )
-            pygame.draw.circle(
+            pygame.draw.rect(
                 canvas,
-                (255, 255, 255),
-                (self.window_size/2,(i+0.5)*pix_square_size),
-                20,
+                (255,255,255),
+                pygame.Rect(
+                    (self.window_size/2-elevator_width/2,(i+0.5)*pix_square_size-elevator_height/2),
+                    (elevator_width,elevator_height)
+                )
             )
+
+            # pygame.draw.circle(
+            #     canvas,
+            #     (255, 255, 255),
+            #     (self.window_size/2,(i+0.5)*pix_square_size),
+            #     20,
+            # )
             pygame.draw.circle(
                 canvas,
                 color[self.observation['buttonsIn'][i]],
@@ -228,7 +249,7 @@ class ElevatorEnv(gym.Env):
             canvas,
             (255, 0, 0),
             pygame.Rect(
-                (self.window_size/2-elevator_width/2,self.window_size-pix_square_size/2-self.observation['location'][0]/FLOOR_HEIGHT*floor_pixel_size-elevator_height),
+                (self.window_size/2-elevator_width/2,self.window_size-pix_square_size/2-self.observation['location'][0]/FLOOR_HEIGHT*floor_pixel_size-elevator_height/2),
                 (elevator_width, elevator_height),
             ),
         )
@@ -250,10 +271,15 @@ class ElevatorEnv(gym.Env):
                     20,
                 )
 
-        text=self.font.render(str(round(self.observation['location'][0],2)),True,(0,0,0),(255,255,255))
-        textRect=text.get_rect()
-        textRect.center=(150,80)
-        canvas.blit(text,textRect)
+        loc_text=self.font.render("loc(m): "+str(round(self.observation['location'][0],2)),True,(0,0,0),(255,255,255))
+        loc_text_rect=loc_text.get_rect()
+        loc_text_rect.center=(150,40)
+        canvas.blit(loc_text,loc_text_rect)
+
+        rew_text=self.font.render("rew : "+str(round(self.reward,2)),True,(0,0,0),(255,255,255))
+        rew_text_rect=rew_text.get_rect()
+        rew_text_rect.center=(800,40)
+        canvas.blit(rew_text,rew_text_rect)
 
             
         if self.render_mode == "human":
@@ -275,6 +301,7 @@ class ElevatorEnv(gym.Env):
         self.done=False
         self.passengerEnv.reset()
         self.observation=self.start_state
+        self.reward=0
         return self.observation,{"info":None}
         
     def step(self, action):
@@ -296,6 +323,7 @@ class ElevatorEnv(gym.Env):
         self.observation=next_state        
 
         reward=self.compute_reward(prev_state,action,next_state)
+        self.reward+=reward
         self.done = self.passengerEnv.all_arrived()
 
         return self.observation,reward,self.done,truncated,{"info":None}
