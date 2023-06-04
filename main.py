@@ -114,13 +114,13 @@ def main(args):
 	# observation and action spaces.
 
 	env = gym.make('Elevator-v0')
-	obs_dim = env.observation_space.shape
-	act_dim = env.action_space.shape
-	print(obs_dim)
-	print(act_dim)
 	env.reset()
-	plt.imshow(env.render())
-	plt.show()
+	# obs_dim = env.observation_space.shape
+	# act_dim = env.action_space.shape
+	# print(obs_dim)
+	# print(act_dim)
+	# plt.imshow(env.render())
+	# plt.show()
 	eval_policy('Elevator-v0',policy=dummy_policy,episodes=10)
 	
     

@@ -110,9 +110,10 @@ class ElevatorEnv(gym.Env):
     
         if passenger_mode=='determined':
             self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
-                                 "buttonsIn":self.passengerEnv.get_buttonsIn(),
-                                 "location":0.0,
-                                 "velocity":0.0})
+                                     "buttonsIn":self.passengerEnv.get_buttonsIn(),
+                                     "location": np.array([0.0], dtype=np.float32),
+                                     "velocity": np.array([0.0], dtype=np.float32)
+                                     })
         self.terminal_state = 0
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -135,22 +136,22 @@ class ElevatorEnv(gym.Env):
     def probability_function(self,state):
         return False
     
-    def check_floor(self, state):
-        location = state['location'] / FLOOR_HEIGHT
-        velocity = state['velocity']
+    def check_floor(self, location, velocity):
+        location = location[0] / FLOOR_HEIGHT
+        velocity = velocity[0]
         if abs(round(location)-location)<FLOOR_RANGE and abs(velocity)<STOP_VEL_RANGE:
             return True, round(location)
         else:
             return False, None
         
-    def clip(self, state):
-        if  state['location']<0:
-            state['location']=0
-            state['velocity']=0
-        elif state['location']>FLOOR_HEIGHT*(self.tot_floor-1):
-            state['location']=FLOOR_HEIGHT*(self.tot_floor-1)
-            state['velocity']=0
-        return state
+    def clip(self, location, velocity):
+        if  location[0]<0:
+            location=np.array([0.0], dtype=np.float32)
+            velocity=np.array([0.0], dtype=np.float32)
+        elif location[0]>FLOOR_HEIGHT*(self.tot_floor-1):
+            location=np.array([FLOOR_HEIGHT * (self.tot_floor - 1)], dtype=np.float32)
+            velocity=np.array([0.0], dtype=np.float32)
+        return location, velocity
     
     def accel_relu(self,action):
         if abs(action)>ACCEL_THRESHOLD:
@@ -225,7 +226,7 @@ class ElevatorEnv(gym.Env):
             canvas,
             (255, 0, 0),
             pygame.Rect(
-                (self.window_size/2-elevator_width/2,self.window_size-pix_square_size/2-self.observation['location']/FLOOR_HEIGHT*floor_pixel_size-elevator_height),
+                (self.window_size/2-elevator_width/2,self.window_size-pix_square_size/2-self.observation['location'][0]/FLOOR_HEIGHT*floor_pixel_size-elevator_height),
                 (elevator_width, elevator_height),
             ),
         )
@@ -247,7 +248,7 @@ class ElevatorEnv(gym.Env):
                     20,
                 )
 
-        text=self.font.render(str(round(self.observation['location'],2)),True,(0,0,0),(255,255,255))
+        text=self.font.render(str(round(self.observation['location'][0],2)),True,(0,0,0),(255,255,255))
         textRect=text.get_rect()
         textRect.center=(150,80)
         canvas.blit(text,textRect)
@@ -267,7 +268,7 @@ class ElevatorEnv(gym.Env):
                 np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
             )
     
-    def reset(self):
+    def reset(self, seed=None, options=None):
     # 환경 초기화
         self.done=False
         self.passengerEnv.reset()
@@ -278,24 +279,23 @@ class ElevatorEnv(gym.Env):
     # 주어진 동작을 위치로 마크를 배치
     # elevator 1층, 최상층 범위 벗어나려 할때 reward needed
         truncated=False
+        
         prev_state=self.observation
         next_state=prev_state.copy()
-
-        next_state['location']+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
+        next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
-        self.clip(next_state)
+        next_state["location"], next_state["velocity"] = self.clip(next_state["location"], next_state["velocity"])
         
-        is_floor,floor=self.check_floor(next_state)
+        is_floor,floor=self.check_floor(next_state["location"], next_state["velocity"])
         if is_floor:
             self.passengerEnv.on_off_board(floor)
             next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
             next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
+        self.observation=next_state        
 
         reward=self.compute_reward(prev_state,action,next_state)
-        self.observation=next_state        
         self.done = self.passengerEnv.all_arrived()
 
-                
         return self.observation,reward,self.done,truncated,{"info":None}
     
     def close(self):
