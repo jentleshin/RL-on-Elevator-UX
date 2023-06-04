@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+import copy
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
@@ -163,6 +163,7 @@ class ElevatorEnv(gym.Env):
     def compute_reward(self, prev_state, action, next_state):
         reward_arg = self.passengerEnv.get_current_arrival()
         reward=self.accel_relu(action)+STEP_REWARD+(reward_arg)*REWARD_SUCCESS
+        #reward=self.accel_relu(action)+(reward_arg)*REWARD_SUCCESS
         self.passengerEnv.reset_current_arrival()
         return reward
     
