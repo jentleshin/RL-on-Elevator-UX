@@ -15,7 +15,7 @@ def main(args):
         vec_env = make_vec_env('Elevator-v0', n_envs=8)
         model = PPO('MultiInputPolicy', vec_env, verbose=1)
         model.learn(total_timesteps=args.timesteps)
-        model.save(args.path)
+        model.save(f"./checkpoint/{args.checkpoint}")
         print("Successfully saved trained model!")
         return
 
@@ -26,7 +26,7 @@ def main(args):
         # plt.show()
 
 
-        model = PPO.load(args.path)
+        model = PPO.load(f"./checkpoint/{args.checkpoint}")
         vec_env = make_vec_env('Elevator-v0', n_envs=1)
         obs = vec_env.reset()
 
@@ -57,12 +57,12 @@ if __name__ == "__main__":
     # Subparser for the "train" mode
     train_parser = subparsers.add_parser("train")
     train_parser.add_argument("--timesteps", type=int, default=250000)
-    train_parser.add_argument("--path", type=str, default="./checkpoint/recent")
+    train_parser.add_argument("--checkpoint", type=str, default="recent")
 
     # Subparser for the "test" mode
     test_parser = subparsers.add_parser("test")
     test_parser.add_argument("--num_episodes", type=int, default=10)
-    test_parser.add_argument("--path", type=str, default="./checkpoint/recent")
+    test_parser.add_argument("--checkpoint", type=str, default="recent")
     test_parser.add_argument("--filename", type=str, default="recent")
 
     args = parser.parse_args()
