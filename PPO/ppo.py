@@ -4,7 +4,6 @@
 			It can be found here: https://spinningup.openai.com/en/latest/_images/math/e62a8971472597f4b014c2da064f636ffe365ba3.svg
 """
 
-import gym
 import time
 
 import numpy as np

@@ -20,7 +20,7 @@ class State(Enum):
     ARRIVAL = 2
 
 class Passenger():
-    def __init__(self, origin,dest):
+    def __init__(self, origin, dest):
         """
         An initialization function
 
@@ -35,84 +35,79 @@ class Passenger():
         """
         self.origin=origin
         self.dest=dest
-        self.state = State.WAIT
+        self.state = None
 
 class PassengerEnv():
-    def __init__(self,passenger_state=[(2,0),(1,0)]):
+    def __init__(self, tot_floor, passenger_args=[(2,0),(1,0)]):
         self.passengers=list()
-        for i in range(len(passenger_state)):
-            self.passengers.append(Passenger(passenger_state[i][0],passenger_state[i][1]))
-    
-    def buttonsPushed(self,tot_floor):
-        buttons=np.zeros(tot_floor,dtype=int)
-        for i in range(len(self.passengers)):
-            buttons[self.passengers[i].origin]=1
-        return buttons
+        self.tot_floor = tot_floor
 
-    def num_on_board(self):
-        num=0
-        for i in range(len(self.passengers)):
-            if self.passengers[i].board() is True:
-                num+=1
-        return num
+        self.waiting = {i: [] for i in range(tot_floor)}
+        self.onboarding = {i: [] for i in range(tot_floor)}
+        self.arrived = {i: [] for i in range(tot_floor)}
+        
+        # reward_args used for calculating reward
+        self.current_arrival = 0
+
+        for passenger_arg in passenger_args:
+            self.create(passenger_arg)
     
-    def check_arrival(self):
-        num=0
-        i=0
-        for i in range(len(self.passengers)):
-            if not self.passengers:
-               return -1
-            if self.passengers[i].state is State.ARRIVAL:
-                num+=1
-            else:
-                i+=1
-        return num
+    def create(self, passenger_args):
+        passenger = Passenger(*passenger_args)
+        passenger.state = State.WAIT
+        self.waiting[passenger.origin].append(passenger)
+        self.passengers.append(passenger)
+
+    def get_buttonsIn(self):
+        return np.array([bool(value) for value in self.onboarding.values()])
+    
+    def get_buttonsOut(self):
+        return np.array([bool(value) for value in self.waiting.values()])
     
     def on_off_board(self,floor):
-        buttonsIn=list()
-        for i in range(len(self.passengers)):
-            if self.passengers[i].state==State.ONBOARD:
-                if self.passengers[i].dest==floor:
-                    self.passengers[i].state=State.ARRIVAL
-            elif self.passengers[i].state==State.WAIT:
-                if self.passengers[i].origin==floor:
-                    self.passengers[i].state=State.ONBOARD
-                buttonsIn.append(self.passengers[i].dest)
-        return buttonsIn
+        for passenger in self.waiting[floor]:
+            passenger.state = State.ONBOARD
+            self.onboarding[passenger.dest].append(passenger)
+        self.waiting[floor]=[]
 
+        self.num_arrival = len(self.onboarding[floor])
+        for passenger in self.onboarding[floor]:
+            passenger.state = State.ARRIVAL
+            self.arrived[floor].append(passenger)
+        self.onboarding[floor]=[]
+        return
+    
+    def get_current_arrival(self):
+        return self.current_arrival
+    
+    def reset_current_arrival(self):
+        self.current_arrival = 0
+        return
+    
+    def all_arrived(self):
+        return all(passenger.state==State.ARRIVAL for passenger in self.passengers)
+    
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    def __init__(self, render_mode="rgb_array",tot_floor=3,
-                 passenger_status=PassengerEnv(),passenger_mode='determined'):
-        """
-        An initialization function
-
-        Parameters
-        ----------
-        size: a list of integers
-            the dimension of 2D grid environment
-        start: integer
-            start state (i.e., location)
-        epsilon: float
-            the probability of taking random actions
-        obstacle: 
-
-        """
+    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode='determined'):
         self.render_mode = render_mode
 
         ''' set observation space and action space '''
-        self.observation_space = spaces.Dict({"buttonsOut":spaces.MultiBinary(tot_floor),
-                            "buttonsIn":spaces.MultiBinary(tot_floor),
-                            "location":spaces.Box(low=0,high=FLOOR_HEIGHT*tot_floor),
-                            "velocity":spaces.Box(low=-MAX_VELOCITY,high=MAX_VELOCITY)})
+        self.observation_space = spaces.Dict({
+            "buttonsOut":spaces.MultiBinary(tot_floor),
+            "buttonsIn":spaces.MultiBinary(tot_floor),
+            "location":spaces.Box(low=0,high=FLOOR_HEIGHT*tot_floor),
+            "velocity":spaces.Box(low=-MAX_VELOCITY,high=MAX_VELOCITY)
+            })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
-        self.passenger_status=passenger_status
+        
+        self.passenger_status=PassengerEnv(tot_floor)
         self.tot_floor=tot_floor
         self.passenger_arrived=0
     
         if passenger_mode=='determined':
-            self.start_state = dict({"buttonsOut":passenger_status.buttonsPushed(tot_floor),
-                                 "buttonsIn":np.zeros(tot_floor,dtype=int),
+            self.start_state = dict({"buttonsOut":self.passenger_status.get_buttonsOut(),
+                                 "buttonsIn":self.passenger_status.get_buttonsIn(),
                                  "location":0.0,
                                  "velocity":0.0})
         self.terminal_state = 0
@@ -138,18 +133,20 @@ class ElevatorEnv(gym.Env):
         return False
     
     def check_floor(self, state):
-        location = state['location']
+        location = state['location'] / FLOOR_HEIGHT
         velocity = state['velocity']
         if abs(round(location)-location)<FLOOR_RANGE and abs(velocity)<STOP_VEL_RANGE:
-            return round(location)
+            return True, round(location)
         else:
-            return -1
+            return False, None
         
     def clip(self, state):
         if  state['location']<0:
             state['location']=0
-        if  state['location']>FLOOR_HEIGHT*(self.tot_floor-1):
+            state['velocity']=0
+        elif state['location']>FLOOR_HEIGHT*(self.tot_floor-1):
             state['location']=FLOOR_HEIGHT*(self.tot_floor-1)
+            state['velocity']=0
         return state
     
     def accel_relu(self,action):
@@ -158,17 +155,11 @@ class ElevatorEnv(gym.Env):
         else:
             return 0
         
-    def compute_reward(self,state,action,next_state):
-        arrival=self.passenger_status.check_arrival()
-        reward=self.accel_relu(action)
-        reward+=STEP_REWARD+(arrival-self.passenger_arrived)*REWARD_SUCCESS
-        self.passenger_arrived=arrival
+    def compute_reward(self, prev_state, action, next_state):
+        reward_arg = self.passenger_status.get_current_arrival()
+        reward=self.accel_relu(action)+STEP_REWARD+(reward_arg)*REWARD_SUCCESS
+        self.passenger_status.reset_current_arrival()
         return reward
-    
-    def is_done(self,state,action,next_state):
-        if self.passenger_arrived==len(self.passenger_status.passengers):
-            self.done=True
-        return self.done
     
     def render(self):
         if self.render_mode == "rgb_array":
@@ -277,13 +268,12 @@ class ElevatorEnv(gym.Env):
     # 환경 초기화
         self.done=False
         self.observation=self.start_state
-        return self.observation
+        return self.observation,{"info":None}
         
     def step(self, action):
     # 주어진 동작을 위치로 마크를 배치
     # elevator 1층, 최상층 범위 벗어나려 할때 reward needed
         truncated=False
-        buttonsIn=None
         prev_state=self.observation
         next_state=prev_state.copy()
 
@@ -291,20 +281,18 @@ class ElevatorEnv(gym.Env):
         next_state['velocity']+=DELTA_T*action
         self.clip(next_state)
         
-        curr_floor=self.check_floor(next_state)
-        if curr_floor!=-1:
-            buttonsIn=self.passenger_status.on_off_board(curr_floor)
-            if buttonsIn!=None:
-                for i in range(len(buttonsIn)):
-                    next_state['buttonsOut'][buttonsIn[i]]=0
-                    next_state['buttonsIn'][buttonsIn[i]]=1
+        is_floor,floor=self.check_floor(next_state)
+        if is_floor:
+            self.passenger_status.on_off_board(floor)
+            next_state['buttonsOut']=self.passenger_status.get_buttonsOut()
+            next_state['buttonsIn']=self.passenger_status.get_buttonsIn()
 
         reward=self.compute_reward(prev_state,action,next_state)
-
         self.observation=next_state        
-        self.done=self.is_done(prev_state,action,next_state)
+        self.done = self.passenger_status.all_arrived()
+
                 
-        return (self.observation,reward,self.done,truncated,{"info":0})
+        return self.observation,reward,self.done,truncated,{"info":None}
     
     def close(self):
         if self.window is not None:
