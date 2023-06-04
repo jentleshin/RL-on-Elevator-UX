@@ -3,6 +3,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import pygame
+from enum import Enum
 
 FLOOR_HEIGHT=3.0
 MAX_VELOCITY=100.0
@@ -12,6 +13,11 @@ FLOOR_RANGE=0.1
 STOP_VEL_RANGE=0.1
 REWARD_SUCCESS=10
 ACCEL_THRESHOLD=5
+
+class State(Enum):
+    WAIT = 0
+    ONBOARD = 1
+    ARRIVAL = 2
 
 class Passenger():
     def __init__(self, origin,dest):
@@ -24,17 +30,12 @@ class Passenger():
 
         dest: destination of passenger
 
-        on_board: boolean
-            whether the passenger is on board the elevator
-        arrival: boolean
-            whether the passenger arrived the destination
+        state: one of WAIT, ONBOARD, ARRIVAL
             
         """
         self.origin=origin
         self.dest=dest
-        self.on_board=False
-        self.arrival=False
-
+        self.state = State.WAIT
 
 class PassengerEnv():
     def __init__(self,passenger_state=[(2,0),(1,0)]):
@@ -61,7 +62,7 @@ class PassengerEnv():
         for i in range(len(self.passengers)):
             if not self.passengers:
                return -1
-            if self.passengers[i].arrival is True:
+            if self.passengers[i].state is State.ARRIVAL:
                 num+=1
             else:
                 i+=1
@@ -70,15 +71,13 @@ class PassengerEnv():
     def on_off_board(self,floor):
         buttonsIn=list()
         for i in range(len(self.passengers)):
-            if self.passengers[i].on_board==True:
+            if self.passengers[i].state==State.ONBOARD:
                 if self.passengers[i].dest==floor:
-                    self.passengers[i].arrival=True
-                    self.passengers[i].on_board=False
-
-            if self.passengers[i].origin==floor:
-                self.passengers[i].on_board=True
+                    self.passengers[i].state=State.ARRIVAL
+            elif self.passengers[i].state==State.WAIT:
+                if self.passengers[i].origin==floor:
+                    self.passengers[i].state=State.ONBOARD
                 buttonsIn.append(self.passengers[i].dest)
-        
         return buttonsIn
 
 class ElevatorEnv(gym.Env):
@@ -138,18 +137,21 @@ class ElevatorEnv(gym.Env):
     def probability_function(self,state):
         return False
     
-    def check_floor(self,state,action,next_state):
-        curr_floor=-1
-        for i in range(self.tot_floor):
-            if abs(i-next_state['location'])<FLOOR_RANGE:
-                curr_floor=i
-        if curr_floor==-1:
-            return -1
-        if abs(next_state['velocity'])<STOP_VEL_RANGE:
-            return curr_floor
+    def check_floor(self, state):
+        location = state['location']
+        velocity = state['velocity']
+        if abs(round(location)-location)<FLOOR_RANGE and abs(velocity)<STOP_VEL_RANGE:
+            return round(location)
         else:
             return -1
-
+        
+    def clip(self, state):
+        if  state['location']<0:
+            state['location']=0
+        if  state['location']>FLOOR_HEIGHT*(self.tot_floor-1):
+            state['location']=FLOOR_HEIGHT*(self.tot_floor-1)
+        return state
+    
     def accel_relu(self,action):
         if abs(action)>ACCEL_THRESHOLD:
             return ACCEL_THRESHOLD-abs(action)
@@ -236,14 +238,14 @@ class ElevatorEnv(gym.Env):
         num_arrived=0
         # Now we draw the agent
         for i in range(len(self.passenger_status.passengers)):
-            if self.passenger_status.passengers[i].arrival is True:
+            if self.passenger_status.passengers[i].state is State.ARRIVAL:
                 pygame.draw.circle(
                     canvas,
                     (255, 0, 0),
                     (self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size ),
                     20,
                 )
-            elif self.passenger_status.passengers[i].on_board is False:
+            elif self.passenger_status.passengers[i].state is State.WAIT:
                 pygame.draw.circle(
                     canvas,
                     (0, 0, 255),
@@ -284,21 +286,12 @@ class ElevatorEnv(gym.Env):
         buttonsIn=None
         prev_state=self.observation
         next_state=prev_state.copy()
-        if prev_state['location']==0:
-            if action<0:
-                action=0
-        if prev_state['location']==FLOOR_HEIGHT*(self.tot_floor-1):
-            if action>0:
-                action=0
 
         next_state['location']+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
-        if next_state['location']<0:
-            next_state['location']=0
-        if next_state['location']>FLOOR_HEIGHT*(self.tot_floor-1):
-            next_state['location']=FLOOR_HEIGHT*(self.tot_floor-1)
-
-        curr_floor=self.check_floor(prev_state,action,next_state)
+        self.clip(next_state)
+        
+        curr_floor=self.check_floor(next_state)
         if curr_floor!=-1:
             buttonsIn=self.passenger_status.on_off_board(curr_floor)
             if buttonsIn!=None:
@@ -312,10 +305,8 @@ class ElevatorEnv(gym.Env):
         self.done=self.is_done(prev_state,action,next_state)
                 
         return (self.observation,reward,self.done,truncated,{"info":0})
+    
     def close(self):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
-
-
-
