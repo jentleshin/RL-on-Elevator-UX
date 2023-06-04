@@ -57,7 +57,7 @@ if __name__ == "__main__":
     test_parser = subparsers.add_parser("test")
     test_parser.add_argument("--num_episodes", type=int, default=10)
     test_parser.add_argument("--path", type=str, default="./checkpoint/recent")
-    test_parser.add_argument("--filename", type=str, default="./video/recent.mp4")
+    test_parser.add_argument("--filename", type=str, default="./recent.mp4")
 
     args = parser.parse_args()
     main(args)

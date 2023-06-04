@@ -4,6 +4,7 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 from enum import Enum
+import copy
 
 FLOOR_HEIGHT=3.0
 MAX_VELOCITY=100.0
@@ -273,6 +274,7 @@ class ElevatorEnv(gym.Env):
         self.done=False
         self.passengerEnv.reset()
         self.observation=self.start_state
+        print(self.observation['location'])
         return self.observation,{"info":None}
         
     def step(self, action):
@@ -281,7 +283,7 @@ class ElevatorEnv(gym.Env):
         truncated=False
         
         prev_state=self.observation
-        next_state=prev_state.copy()
+        next_state=copy.deepcopy(prev_state)
         next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
         next_state["location"], next_state["velocity"] = self.clip(next_state["location"], next_state["velocity"])
