@@ -41,6 +41,7 @@ class PassengerEnv():
     def __init__(self, tot_floor, passenger_args=[(2,0),(1,0)]):
         self.passengers=list()
         self.tot_floor = tot_floor
+        self.passenger_args = passenger_args
 
         self.waiting = {i: [] for i in range(tot_floor)}
         self.onboarding = {i: [] for i in range(tot_floor)}
@@ -49,7 +50,7 @@ class PassengerEnv():
         # reward_args used for calculating reward
         self.current_arrival = 0
 
-        for passenger_arg in passenger_args:
+        for passenger_arg in self.passenger_args:
             self.create(passenger_arg)
     
     def create(self, passenger_args):
@@ -87,6 +88,9 @@ class PassengerEnv():
     def all_arrived(self):
         return all(passenger.state==State.ARRIVAL for passenger in self.passengers)
     
+    def reset(self):
+        self.__init__(self.tot_floor, self.passenger_args)
+    
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
     def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode='determined'):
@@ -101,13 +105,12 @@ class ElevatorEnv(gym.Env):
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
         
-        self.passenger_status=PassengerEnv(tot_floor)
         self.tot_floor=tot_floor
-        self.passenger_arrived=0
+        self.passengerEnv=PassengerEnv(self.tot_floor)
     
         if passenger_mode=='determined':
-            self.start_state = dict({"buttonsOut":self.passenger_status.get_buttonsOut(),
-                                 "buttonsIn":self.passenger_status.get_buttonsIn(),
+            self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
+                                 "buttonsIn":self.passengerEnv.get_buttonsIn(),
                                  "location":0.0,
                                  "velocity":0.0})
         self.terminal_state = 0
@@ -156,9 +159,9 @@ class ElevatorEnv(gym.Env):
             return 0
         
     def compute_reward(self, prev_state, action, next_state):
-        reward_arg = self.passenger_status.get_current_arrival()
+        reward_arg = self.passengerEnv.get_current_arrival()
         reward=self.accel_relu(action)+STEP_REWARD+(reward_arg)*REWARD_SUCCESS
-        self.passenger_status.reset_current_arrival()
+        self.passengerEnv.reset_current_arrival()
         return reward
     
     def render(self):
@@ -228,15 +231,15 @@ class ElevatorEnv(gym.Env):
         )
         num_arrived=0
         # Now we draw the agent
-        for i in range(len(self.passenger_status.passengers)):
-            if self.passenger_status.passengers[i].state is State.ARRIVAL:
+        for i in range(len(self.passengerEnv.passengers)):
+            if self.passengerEnv.passengers[i].state is State.ARRIVAL:
                 pygame.draw.circle(
                     canvas,
                     (255, 0, 0),
                     (self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size ),
                     20,
                 )
-            elif self.passenger_status.passengers[i].state is State.WAIT:
+            elif self.passengerEnv.passengers[i].state is State.WAIT:
                 pygame.draw.circle(
                     canvas,
                     (0, 0, 255),
@@ -267,6 +270,7 @@ class ElevatorEnv(gym.Env):
     def reset(self):
     # 환경 초기화
         self.done=False
+        self.passengerEnv.reset()
         self.observation=self.start_state
         return self.observation,{"info":None}
         
@@ -283,13 +287,13 @@ class ElevatorEnv(gym.Env):
         
         is_floor,floor=self.check_floor(next_state)
         if is_floor:
-            self.passenger_status.on_off_board(floor)
-            next_state['buttonsOut']=self.passenger_status.get_buttonsOut()
-            next_state['buttonsIn']=self.passenger_status.get_buttonsIn()
+            self.passengerEnv.on_off_board(floor)
+            next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
+            next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
 
         reward=self.compute_reward(prev_state,action,next_state)
         self.observation=next_state        
-        self.done = self.passenger_status.all_arrived()
+        self.done = self.passengerEnv.all_arrived()
 
                 
         return self.observation,reward,self.done,truncated,{"info":None}
