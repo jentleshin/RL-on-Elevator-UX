@@ -4,6 +4,7 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 from enum import Enum
+import copy
 
 FLOOR_HEIGHT=3.0
 MAX_VELOCITY=100.0
@@ -274,6 +275,7 @@ class ElevatorEnv(gym.Env):
         self.done=False
         self.passengerEnv.reset()
         self.observation=self.start_state
+        print(self.observation['location'])
         return self.observation,{"info":None}
         
     def step(self, action):
