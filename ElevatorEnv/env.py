@@ -94,7 +94,7 @@ class PassengerEnv():
     
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode='determined'):
+    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode='determined',passenger_num=5):
         self.render_mode = render_mode
 
         ''' set observation space and action space '''
@@ -108,15 +108,22 @@ class ElevatorEnv(gym.Env):
         self.reward=0
         
         self.tot_floor=tot_floor
-        self.passengerEnv=PassengerEnv(self.tot_floor)
+        
     
         if passenger_mode=='determined':
-            self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
+            self.passengerEnv=PassengerEnv(self.tot_floor)
+        
+        elif passenger_mode=='randomly_fixed':
+            passenger_args=self.randomly_fix_passenger_args(tot_floor,passenger_num)
+            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+
+        self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                      "buttonsIn":self.passengerEnv.get_buttonsIn(),
                                      "location": np.array([0.0], dtype=np.float32),
                                      "velocity": np.array([0.0], dtype=np.float32)
                                      })
-        self.terminal_state = 0
+
+        #self.terminal_state = 0
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -135,6 +142,16 @@ class ElevatorEnv(gym.Env):
         self.window = None
         self.clock = None
 
+    def randomly_fix_passenger_args(self,tot_floor,passenger_num):
+        passenger_args=[]
+
+        for i in range(passenger_num):
+            passenger_origin=np.random.randint(0,tot_floor)
+            passenger_dest=np.random.randint(0,tot_floor)
+            while passenger_dest==passenger_origin:
+                passenger_dest=np.random.randint(0,tot_floor)
+            passenger_args.append((passenger_origin,passenger_dest))
+        return passenger_args
 
     def probability_function(self,state):
         return False
