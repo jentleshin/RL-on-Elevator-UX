@@ -20,31 +20,31 @@ def main(args):
         return
 
     elif args.mode == "test":
-        env=gym.make('Elevator-v0')
-        env.reset()
-        plt.imshow(env.render())
-        plt.show()
+        # env=gym.make('Elevator-v0')
+        # env.reset()
+        # plt.imshow(env.render())
+        # plt.show()
 
 
-        # model = PPO.load(f"./checkpoint/{args.checkpoint}")
-        # vec_env = make_vec_env('Elevator-v0', n_envs=1)
-        # obs = vec_env.reset()
+        model = PPO.load(f"./checkpoint/{args.checkpoint}")
+        vec_env = make_vec_env('Elevator-v0', n_envs=1)
+        obs = vec_env.reset()
 
-        # output_video = skvideo.io.FFmpegWriter(f"./video/{args.filename}.mp4")
-        # counter=0
-        # num_runs=0
-        # while num_runs < args.num_episodes:
-        #     action, _ = model.predict(obs)
-        #     obs, _, done, _ = vec_env.step(action)
-        #     frame = vec_env.render()
-        #     output_video.writeFrame(frame)
-        #     counter += 1
+        output_video = skvideo.io.FFmpegWriter(f"./video/{args.filename}.mp4")
+        counter=0
+        num_runs=0
+        while num_runs < args.num_episodes:
+            action, _ = model.predict(obs)
+            obs, _, done, _ = vec_env.step(action)
+            frame = vec_env.render()
+            output_video.writeFrame(frame)
+            counter += 1
 
-        #     if done:
-        #         obs = vec_env.reset()
-        #         num_runs += 1
+            if done:
+                obs = vec_env.reset()
+                num_runs += 1
 
-        # print("Successfully saved {} frames into {}!".format(counter, args.filename))
+        print("Successfully saved {} frames into {}!".format(counter, args.filename))
 
 
 

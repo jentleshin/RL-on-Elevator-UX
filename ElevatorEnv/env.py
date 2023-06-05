@@ -94,7 +94,7 @@ class PassengerEnv():
     
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode='determined',passenger_num=5):
+    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode='randomly_fixed',passenger_num=5):
         self.render_mode = render_mode
 
         ''' set observation space and action space '''
@@ -271,31 +271,35 @@ class ElevatorEnv(gym.Env):
                 (elevator_width, elevator_height),
             ),
         )
-        num_arrived=0
+        num_arrived=np.zeros(self.tot_floor)
+        num_waiting=np.zeros(self.tot_floor)
+
         # Now we draw the agent
         for i in range(len(self.passengerEnv.passengers)):
             if self.passengerEnv.passengers[i].state is State.ARRIVAL:
                 pygame.draw.circle(
                     canvas,
                     (255, 0, 0),
-                    (self.window_size/2 +100 + 50*num_arrived ,self.window_size-(0.5)*pix_square_size ),
+                    (self.window_size/2 +100 + 50*num_arrived[self.passengerEnv.passengers[i].dest] ,self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size),
                     20,
                 )
                 origin_text=self.numfont.render(str(self.passengerEnv.passengers[i].origin) ,True,(255,255,255))
                 origin_text_rect=origin_text.get_rect()
-                origin_text_rect.center=(self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size )
+                origin_text_rect.center=(self.window_size/2 +100 + 50*num_arrived[self.passengerEnv.passengers[i].dest],self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size )
                 canvas.blit(origin_text,origin_text_rect)
+                num_arrived[self.passengerEnv.passengers[i].dest]+=1
             elif self.passengerEnv.passengers[i].state is State.WAIT:
                 pygame.draw.circle(
                     canvas,
                     (0, 0, 255),
-                    (self.window_size/2 -100 ,(i+0.5)*pix_square_size ),
+                    (self.window_size/2 -100- 50*num_waiting[self.passengerEnv.passengers[i].origin] ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size ),
                     20,
                 )
                 dest_text=self.numfont.render(str(self.passengerEnv.passengers[i].dest),True,(255,255,255))
                 dest_text_rect=dest_text.get_rect()
-                dest_text_rect.center=(self.window_size/2 -100 ,(i+0.5)*pix_square_size )
+                dest_text_rect.center=(self.window_size/2 -100 -50*num_waiting[self.passengerEnv.passengers[i].origin] ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size )
                 canvas.blit(dest_text,dest_text_rect)
+                num_waiting[self.passengerEnv.passengers[i].origin]+=1
 
         loc_text=self.font.render("loc(m): "+str(round(self.observation['location'][0],2)),True,(0,0,0))
         loc_text_rect=loc_text.get_rect()
@@ -327,7 +331,9 @@ class ElevatorEnv(gym.Env):
         self.done=False
         self.passengerEnv.reset()
         self.observation=self.start_state
+        self.observation['location']=np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32)
         self.reward=0
+
         return self.observation,{"info":None}
         
     def step(self, action):
