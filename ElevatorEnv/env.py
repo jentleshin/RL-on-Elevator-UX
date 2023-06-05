@@ -122,6 +122,7 @@ class ElevatorEnv(gym.Env):
         self.render_mode = render_mode
         pygame.font.init()
         self.font=pygame.font.Font('freesansbold.ttf',40)
+        self.numfont=pygame.font.Font('freesansbold.ttf',10)
 
         """
         If human-rendering is used, `self.window` will be a reference
@@ -263,6 +264,10 @@ class ElevatorEnv(gym.Env):
                     (self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size ),
                     20,
                 )
+                origin_text=self.numfont.render(self.passengerEnv.passengers[i].origin,True,(0,0,0))
+                origin_text_rect=origin_text.get_rect()
+                origin_text_rect.center=(self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size )
+                canvas.blit(origin_text,origin_text_rect)
             elif self.passengerEnv.passengers[i].state is State.WAIT:
                 pygame.draw.circle(
                     canvas,
@@ -270,13 +275,17 @@ class ElevatorEnv(gym.Env):
                     (self.window_size/2 -100 ,(i+0.5)*pix_square_size ),
                     20,
                 )
+                dest_text=self.numfont.render(self.passengerEnv.passengers[i].origin,True,(0,0,0))
+                dest_text_rect=dest_text.get_rect()
+                dest_text_rect.center=(self.window_size/2 -100 ,(i+0.5)*pix_square_size )
+                canvas.blit(dest_text,dest_text_rect)
 
-        loc_text=self.font.render("loc(m): "+str(round(self.observation['location'][0],2)),True,(0,0,0),(255,255,255))
+        loc_text=self.font.render("loc(m): "+str(round(self.observation['location'][0],2)),True,(0,0,0))
         loc_text_rect=loc_text.get_rect()
         loc_text_rect.center=(150,40)
         canvas.blit(loc_text,loc_text_rect)
 
-        rew_text=self.font.render("rew : "+str(round(self.reward,2)),True,(0,0,0),(255,255,255))
+        rew_text=self.font.render("rew : "+str(round(self.reward,2)),True,(0,0,0))
         rew_text_rect=rew_text.get_rect()
         rew_text_rect.center=(800,40)
         canvas.blit(rew_text,rew_text_rect)
