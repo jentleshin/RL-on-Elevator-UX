@@ -93,8 +93,8 @@ class PassengerEnv():
         self.__init__(self.tot_floor, self.passenger_args)
     
 class ElevatorEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode='randomly_fixed',passenger_num=5):
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_mode":["determined","randomly_fixed","random"]}
+    def __init__(self, render_mode="rgb_array",tot_floor=5, passenger_mode="random",passenger_num=5):
         self.render_mode = render_mode
 
         ''' set observation space and action space '''
@@ -108,18 +108,20 @@ class ElevatorEnv(gym.Env):
         self.reward=0
         
         self.tot_floor=tot_floor
+        self.passenger_mode=passenger_mode
+        self.passenger_num=passenger_num
         
     
-        if passenger_mode=='determined':
+        if passenger_mode=="determined":
             self.passengerEnv=PassengerEnv(self.tot_floor)
         
-        elif passenger_mode=='randomly_fixed':
+        elif "random" in passenger_mode:
             passenger_args=self.randomly_fix_passenger_args(tot_floor,passenger_num)
             self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
 
         self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                      "buttonsIn":self.passengerEnv.get_buttonsIn(),
-                                     "location": np.array([0.0], dtype=np.float32),
+                                     "location": np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32),
                                      "velocity": np.array([0.0], dtype=np.float32)
                                      })
 
@@ -333,6 +335,12 @@ class ElevatorEnv(gym.Env):
         self.observation=self.start_state
         self.observation['location']=np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32)
         self.reward=0
+        if self.passenger_mode=="random":
+            passenger_args=self.randomly_fix_passenger_args(self.tot_floor,self.passenger_num)
+            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+            self.observation['buttonsOut']=self.passengerEnv.get_buttonsOut()
+            self.observation['buttonsIn']=self.passengerEnv.get_buttonsIn()
+
 
         return self.observation,{"info":None}
         
