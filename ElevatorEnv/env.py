@@ -122,7 +122,7 @@ class ElevatorEnv(gym.Env):
         self.render_mode = render_mode
         pygame.font.init()
         self.font=pygame.font.Font('freesansbold.ttf',40)
-        self.numfont=pygame.font.Font('freesansbold.ttf',10)
+        self.numfont=pygame.font.Font('freesansbold.ttf',30)
 
         """
         If human-rendering is used, `self.window` will be a reference
@@ -261,10 +261,10 @@ class ElevatorEnv(gym.Env):
                 pygame.draw.circle(
                     canvas,
                     (255, 0, 0),
-                    (self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size ),
+                    (self.window_size/2 +100 + 50*num_arrived ,self.window_size-(0.5)*pix_square_size ),
                     20,
                 )
-                origin_text=self.numfont.render(self.passengerEnv.passengers[i].origin,True,(0,0,0))
+                origin_text=self.numfont.render(str(self.passengerEnv.passengers[i].origin) ,True,(255,255,255))
                 origin_text_rect=origin_text.get_rect()
                 origin_text_rect.center=(self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size )
                 canvas.blit(origin_text,origin_text_rect)
@@ -275,7 +275,7 @@ class ElevatorEnv(gym.Env):
                     (self.window_size/2 -100 ,(i+0.5)*pix_square_size ),
                     20,
                 )
-                dest_text=self.numfont.render(self.passengerEnv.passengers[i].origin,True,(0,0,0))
+                dest_text=self.numfont.render(str(self.passengerEnv.passengers[i].dest),True,(255,255,255))
                 dest_text_rect=dest_text.get_rect()
                 dest_text_rect.center=(self.window_size/2 -100 ,(i+0.5)*pix_square_size )
                 canvas.blit(dest_text,dest_text_rect)
