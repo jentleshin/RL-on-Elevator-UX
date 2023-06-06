@@ -220,7 +220,7 @@ class ElevatorEnv(gym.Env):
         elevator_width=elevator_height/2
 
         floor_pixel_size=(self.window_size-pix_square_size)/(self.tot_floor-1)
-        borderLine_thickness=floor_pixel_size/FLOOR_HEIGHT*FLOOR_RANGE
+        borderLine_thickness=floor_pixel_size * FLOOR_RANGE
         # First we draw the target
         for i in range(self.tot_floor):
             pygame.draw.rect(
