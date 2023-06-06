@@ -11,14 +11,13 @@ MAX_VELOCITY=100.0
 MIN_VELOCITY=-MAX_VELOCITY
 DELTA_T=0.1
 
-FLOOR_RANGE=0.1
-EDGE_FLOOR_RANGE=0.2
+FLOOR_RANGE=0.2
+EDGE_FLOOR_RANGE=1
 STOP_VEL_RANGE=0.1
 ACCEL_THRESHOLD=5
 
 STEP_REWARD=-0.1
 ACCEL_REWARD=-1
-BUMP_REWARD=-1
 CURRIVAL_REWARD=10
 
 class State(Enum):
@@ -127,7 +126,6 @@ class ElevatorEnv(gym.Env):
         self.terminal_state = 0
         self.reward_args = {
             "accel_overload":0,
-            "bump_velocity":0,
             "current_arrival":0
         }
 
@@ -165,7 +163,7 @@ class ElevatorEnv(gym.Env):
     def check_floor(self, location, velocity):
         location = location[0] / FLOOR_HEIGHT
         velocity = velocity[0]
-        if abs(round(location)-location)<FLOOR_RANGE and abs(velocity)<STOP_VEL_RANGE:
+        if 0<=round(location) and round(location)<self.tot_floor and abs(round(location)-location)<FLOOR_RANGE and abs(velocity)<STOP_VEL_RANGE:
             return True, round(location)
         else:
             return False, None
@@ -178,12 +176,10 @@ class ElevatorEnv(gym.Env):
     def clip(self, state):
         if  state["location"][0]<self.MIN_LOCATION:
             state["location"]=np.array([self.MIN_LOCATION], dtype=np.float32)
-            self.reward_args["bump_velocity"]=abs(state["velocity"][0])
             state["velocity"]=np.array([0.0], dtype=np.float32)
         
         elif state["location"][0]>self.MAX_LOCATION:
             state["location"]=np.array([self.MAX_LOCATION], dtype=np.float32)
-            self.reward_args["bump_velocity"]=abs(state["velocity"][0])
             state["velocity"]=np.array([0.0], dtype=np.float32)
         return
     
@@ -195,8 +191,8 @@ class ElevatorEnv(gym.Env):
         
     def compute_reward(self, prev_state, action, next_state):
         self.reward_args["accel_overload"] = self.accel_relu(action)
-        accel_overLoad, bump_velocity, current_arrival = self.reward_args.values()
-        reward = STEP_REWARD+(accel_overLoad)*ACCEL_REWARD+(bump_velocity)*BUMP_REWARD+(current_arrival)*CURRIVAL_REWARD
+        accel_overLoad, current_arrival = self.reward_args.values()
+        reward = STEP_REWARD+(accel_overLoad)*ACCEL_REWARD+(current_arrival)*CURRIVAL_REWARD
         self.reward_args = {key: 0 for key in self.reward_args}
         #print(f"{STEP_REWARD}, {(accel_overLoad)*ACCEL_REWARD}, {(bump_velocity)*BUMP_REWARD}, {(current_arrival)*CURRIVAL_REWARD}")
         return reward
