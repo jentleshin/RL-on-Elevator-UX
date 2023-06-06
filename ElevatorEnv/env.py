@@ -8,12 +8,18 @@ import copy
 
 FLOOR_HEIGHT=3.0
 MAX_VELOCITY=100.0
+MIN_VELOCITY=-MAX_VELOCITY
 DELTA_T=0.1
-STEP_REWARD=-0.1
+
 FLOOR_RANGE=0.1
+EDGE_FLOOR_RANGE=0.2
 STOP_VEL_RANGE=0.1
-REWARD_SUCCESS=10
 ACCEL_THRESHOLD=5
+
+STEP_REWARD=-0.1
+ACCEL_REWARD=-1
+BUMP_REWARD=-1
+CURRIVAL_REWARD=10
 
 class State(Enum):
     WAIT = 0
@@ -48,9 +54,6 @@ class PassengerEnv():
         self.onboarding = {i: [] for i in range(tot_floor)}
         self.arrived = {i: [] for i in range(tot_floor)}
         
-        # reward_args used for calculating reward
-        self.current_arrival = 0
-
         for passenger_arg in self.passenger_args:
             self.create(passenger_arg)
     
@@ -72,19 +75,12 @@ class PassengerEnv():
             self.onboarding[passenger.dest].append(passenger)
         self.waiting[floor]=[]
 
-        self.current_arrival = len(self.onboarding[floor])
+        current_arrival = len(self.onboarding[floor])
         for passenger in self.onboarding[floor]:
             passenger.state = State.ARRIVAL
             self.arrived[floor].append(passenger)
         self.onboarding[floor]=[]
-        return
-    
-    def get_current_arrival(self):
-        return self.current_arrival
-    
-    def reset_current_arrival(self):
-        self.current_arrival = 0
-        return
+        return current_arrival
     
     def all_arrived(self):
         return all(passenger.state==State.ARRIVAL for passenger in self.passengers)
@@ -98,11 +94,14 @@ class ElevatorEnv(gym.Env):
         self.render_mode = render_mode
 
         ''' set observation space and action space '''
+        self.MIN_LOCATION = FLOOR_HEIGHT*(-EDGE_FLOOR_RANGE)
+        self.MAX_LOCATION = FLOOR_HEIGHT*(tot_floor-1+EDGE_FLOOR_RANGE)
+
         self.observation_space = spaces.Dict({
             "buttonsOut":spaces.MultiBinary(tot_floor),
             "buttonsIn":spaces.MultiBinary(tot_floor),
-            "location":spaces.Box(low=0,high=FLOOR_HEIGHT*tot_floor),
-            "velocity":spaces.Box(low=-MAX_VELOCITY,high=MAX_VELOCITY)
+            "location":spaces.Box(low=self.MIN_LOCATION,high=self.MAX_LOCATION),
+            "velocity":spaces.Box(low=MIN_VELOCITY,high=MAX_VELOCITY)
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
         
@@ -116,6 +115,11 @@ class ElevatorEnv(gym.Env):
                                      "velocity": np.array([0.0], dtype=np.float32)
                                      })
         self.terminal_state = 0
+        self.reward_args = {
+            "accel_overload":0,
+            "bump_velocity":0,
+            "current_arrival":0
+        }
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -145,26 +149,35 @@ class ElevatorEnv(gym.Env):
         else:
             return False, None
         
-    def clip(self, location, velocity):
-        if  location[0]<0:
-            location=np.array([0.0], dtype=np.float32)
-            velocity=np.array([0.0], dtype=np.float32)
-        elif location[0]>FLOOR_HEIGHT*(self.tot_floor-1):
-            location=np.array([FLOOR_HEIGHT * (self.tot_floor - 1)], dtype=np.float32)
-            velocity=np.array([0.0], dtype=np.float32)
-        return location, velocity
+    def on_off_board(self, floor):
+        current_arrival = self.passengerEnv.on_off_board(floor)
+        self.reward_args["current_arrival"] = current_arrival
+        return
+
+    def clip(self, state):
+        if  state["location"][0]<self.MIN_LOCATION:
+            state["location"]=np.array([self.MIN_LOCATION], dtype=np.float32)
+            self.reward_args["bump_velocity"]=abs(state["velocity"][0])
+            state["velocity"]=np.array([0.0], dtype=np.float32)
+        
+        elif state["location"][0]>self.MAX_LOCATION:
+            state["location"]=np.array([self.MAX_LOCATION], dtype=np.float32)
+            self.reward_args["bump_velocity"]=abs(state["velocity"][0])
+            state["velocity"]=np.array([0.0], dtype=np.float32)
+        return
     
     def accel_relu(self,action):
-        if abs(action)>ACCEL_THRESHOLD:
-            return ACCEL_THRESHOLD-abs(action)
+        if abs(action[0])>ACCEL_THRESHOLD:
+            return abs(action[0])-ACCEL_THRESHOLD
         else:
             return 0
         
     def compute_reward(self, prev_state, action, next_state):
-        reward_arg = self.passengerEnv.get_current_arrival()
-        reward=self.accel_relu(action)+STEP_REWARD+(reward_arg)*REWARD_SUCCESS
-        #reward=self.accel_relu(action)+(reward_arg)*REWARD_SUCCESS
-        self.passengerEnv.reset_current_arrival()
+        self.reward_args["accel_overload"] = self.accel_relu(action)
+        accel_overLoad, bump_velocity, current_arrival = self.reward_args.values()
+        reward = STEP_REWARD+(accel_overLoad)*ACCEL_REWARD+(bump_velocity)*BUMP_REWARD+(current_arrival)*CURRIVAL_REWARD
+        self.reward_args = {key: 0 for key in self.reward_args}
+        #print(f"{STEP_REWARD}, {(accel_overLoad)*ACCEL_REWARD}, {(bump_velocity)*BUMP_REWARD}, {(current_arrival)*CURRIVAL_REWARD}")
         return reward
     
     def render(self):
@@ -275,7 +288,6 @@ class ElevatorEnv(gym.Env):
         self.done=False
         self.passengerEnv.reset()
         self.observation=self.start_state
-        print(self.observation['location'])
         return self.observation,{"info":None}
         
     def step(self, action):
@@ -287,11 +299,11 @@ class ElevatorEnv(gym.Env):
         next_state=copy.deepcopy(prev_state)
         next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
-        next_state["location"], next_state["velocity"] = self.clip(next_state["location"], next_state["velocity"])
+        self.clip(next_state)
         
         is_floor,floor=self.check_floor(next_state["location"], next_state["velocity"])
         if is_floor:
-            self.passengerEnv.on_off_board(floor)
+            self.on_off_board(floor)
             next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
             next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
         self.observation=next_state        
