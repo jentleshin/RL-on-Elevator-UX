@@ -7,6 +7,7 @@ import ElevatorEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 
+import matplotlib.pyplot as plt
 
 def main(args):
     
@@ -19,6 +20,12 @@ def main(args):
         return
 
     elif args.mode == "test":
+        # env=gym.make('Elevator-v0')
+        # env.reset()
+        # plt.imshow(env.render())
+        # plt.show()
+
+
         model = PPO.load(f"./checkpoint/{args.checkpoint}")
         vec_env = make_vec_env('Elevator-v0', n_envs=1)
         obs = vec_env.reset()
@@ -36,6 +43,7 @@ def main(args):
             if done:
                 obs = vec_env.reset()
                 num_runs += 1
+
         print("Successfully saved {} frames into {}!".format(counter, args.filename))
 
 

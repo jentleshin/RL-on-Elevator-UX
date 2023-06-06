@@ -89,8 +89,8 @@ class PassengerEnv():
         self.__init__(self.tot_floor, self.passenger_args)
     
 class ElevatorEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode='determined'):
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_mode":["determined","randomly_fixed","random"]}
+    def __init__(self, render_mode="rgb_array",tot_floor=5, passenger_mode="random",passenger_num=5):
         self.render_mode = render_mode
 
         ''' set observation space and action space '''
@@ -104,16 +104,26 @@ class ElevatorEnv(gym.Env):
             "velocity":spaces.Box(low=MIN_VELOCITY,high=MAX_VELOCITY)
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
+        self.reward=0
         
         self.tot_floor=tot_floor
-        self.passengerEnv=PassengerEnv(self.tot_floor)
+        self.passenger_mode=passenger_mode
+        self.passenger_num=passenger_num
+        
     
-        if passenger_mode=='determined':
-            self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
+        if passenger_mode=="determined":
+            self.passengerEnv=PassengerEnv(self.tot_floor)
+        
+        elif "random" in passenger_mode:
+            passenger_args=self.randomly_fix_passenger_args(tot_floor,passenger_num)
+            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+
+        self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                      "buttonsIn":self.passengerEnv.get_buttonsIn(),
-                                     "location": np.array([0.0], dtype=np.float32),
+                                     "location": np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32),
                                      "velocity": np.array([0.0], dtype=np.float32)
                                      })
+
         self.terminal_state = 0
         self.reward_args = {
             "accel_overload":0,
@@ -124,7 +134,8 @@ class ElevatorEnv(gym.Env):
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
         pygame.font.init()
-        self.font=pygame.font.Font('freesansbold.ttf',100)
+        self.font=pygame.font.Font('freesansbold.ttf',40)
+        self.numfont=pygame.font.Font('freesansbold.ttf',30)
 
         """
         If human-rendering is used, `self.window` will be a reference
@@ -137,6 +148,16 @@ class ElevatorEnv(gym.Env):
         self.window = None
         self.clock = None
 
+    def randomly_fix_passenger_args(self,tot_floor,passenger_num):
+        passenger_args=[]
+
+        for i in range(passenger_num):
+            passenger_origin=np.random.randint(0,tot_floor)
+            passenger_dest=np.random.randint(0,tot_floor)
+            while passenger_dest==passenger_origin:
+                passenger_dest=np.random.randint(0,tot_floor)
+            passenger_args.append((passenger_origin,passenger_dest))
+        return passenger_args
 
     def probability_function(self,state):
         return False
@@ -186,8 +207,7 @@ class ElevatorEnv(gym.Env):
 
     def _render_frame(self):
         color=[(0,0,0),(0,255,0)]
-        elevator_width=40
-        elevator_height=0
+
         if self.window is None and self.render_mode == "human":
             pygame.init()
             pygame.display.init()
@@ -201,15 +221,26 @@ class ElevatorEnv(gym.Env):
             self.window_size / self.tot_floor
         )  # The size of a single grid square in pixels
         elevator_height=pix_square_size/3
+        elevator_width=elevator_height/2
+
         floor_pixel_size=(self.window_size-pix_square_size)/(self.tot_floor-1)
+        borderLine_thickness=floor_pixel_size/FLOOR_HEIGHT*FLOOR_RANGE
         # First we draw the target
         for i in range(self.tot_floor):
-            pygame.draw.circle(
+            pygame.draw.rect(
                 canvas,
-                (0, 0, 255),
-                (self.window_size/2,(i+0.5)*pix_square_size),
-                40,
+                (0,0,255),
+                pygame.Rect(
+                    (self.window_size/2-(elevator_width+2*borderLine_thickness)/2,(i+0.5)*pix_square_size-(elevator_height+2*borderLine_thickness)/2),
+                    (elevator_width+2*borderLine_thickness,elevator_height+2*borderLine_thickness)
+                )
             )
+            # pygame.draw.circle(
+            #     canvas,
+            #     (0, 0, 255),
+            #     (self.window_size/2,(i+0.5)*pix_square_size),
+            #     40,
+            # )
             if i!=self.tot_floor-1:
                 pygame.draw.line(
                     canvas,
@@ -218,12 +249,21 @@ class ElevatorEnv(gym.Env):
                     (self.window_size/2,(i+1.5)*pix_square_size),
                     width=10,
                 )
-            pygame.draw.circle(
+            pygame.draw.rect(
                 canvas,
-                (255, 255, 255),
-                (self.window_size/2,(i+0.5)*pix_square_size),
-                20,
+                (255,255,255),
+                pygame.Rect(
+                    (self.window_size/2-elevator_width/2,(i+0.5)*pix_square_size-elevator_height/2),
+                    (elevator_width,elevator_height)
+                )
             )
+
+            # pygame.draw.circle(
+            #     canvas,
+            #     (255, 255, 255),
+            #     (self.window_size/2,(i+0.5)*pix_square_size),
+            #     20,
+            # )
             pygame.draw.circle(
                 canvas,
                 color[self.observation['buttonsIn'][i]],
@@ -241,32 +281,49 @@ class ElevatorEnv(gym.Env):
             canvas,
             (255, 0, 0),
             pygame.Rect(
-                (self.window_size/2-elevator_width/2,self.window_size-pix_square_size/2-self.observation['location'][0]/FLOOR_HEIGHT*floor_pixel_size-elevator_height),
+                (self.window_size/2-elevator_width/2,self.window_size-pix_square_size/2-self.observation['location'][0]/FLOOR_HEIGHT*floor_pixel_size-elevator_height/2),
                 (elevator_width, elevator_height),
             ),
         )
-        num_arrived=0
+        num_arrived=np.zeros(self.tot_floor)
+        num_waiting=np.zeros(self.tot_floor)
+
         # Now we draw the agent
         for i in range(len(self.passengerEnv.passengers)):
             if self.passengerEnv.passengers[i].state is State.ARRIVAL:
                 pygame.draw.circle(
                     canvas,
                     (255, 0, 0),
-                    (self.window_size/2 -100 - 50*num_arrived ,self.window_size-(0.5)*pix_square_size ),
+                    (self.window_size/2 +100 + 50*num_arrived[self.passengerEnv.passengers[i].dest] ,self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size),
                     20,
                 )
+                origin_text=self.numfont.render(str(self.passengerEnv.passengers[i].origin) ,True,(255,255,255))
+                origin_text_rect=origin_text.get_rect()
+                origin_text_rect.center=(self.window_size/2 +100 + 50*num_arrived[self.passengerEnv.passengers[i].dest],self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size )
+                canvas.blit(origin_text,origin_text_rect)
+                num_arrived[self.passengerEnv.passengers[i].dest]+=1
             elif self.passengerEnv.passengers[i].state is State.WAIT:
                 pygame.draw.circle(
                     canvas,
                     (0, 0, 255),
-                    (self.window_size/2 -100 ,(i+0.5)*pix_square_size ),
+                    (self.window_size/2 -100- 50*num_waiting[self.passengerEnv.passengers[i].origin] ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size ),
                     20,
                 )
+                dest_text=self.numfont.render(str(self.passengerEnv.passengers[i].dest),True,(255,255,255))
+                dest_text_rect=dest_text.get_rect()
+                dest_text_rect.center=(self.window_size/2 -100 -50*num_waiting[self.passengerEnv.passengers[i].origin] ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size )
+                canvas.blit(dest_text,dest_text_rect)
+                num_waiting[self.passengerEnv.passengers[i].origin]+=1
 
-        text=self.font.render(str(round(self.observation['location'][0],2)),True,(0,0,0),(255,255,255))
-        textRect=text.get_rect()
-        textRect.center=(150,80)
-        canvas.blit(text,textRect)
+        loc_text=self.font.render("loc(m): "+str(round(self.observation['location'][0],2)),True,(0,0,0))
+        loc_text_rect=loc_text.get_rect()
+        loc_text_rect.center=(150,40)
+        canvas.blit(loc_text,loc_text_rect)
+
+        rew_text=self.font.render("rew : "+str(round(self.reward,2)),True,(0,0,0))
+        rew_text_rect=rew_text.get_rect()
+        rew_text_rect.center=(800,40)
+        canvas.blit(rew_text,rew_text_rect)
 
             
         if self.render_mode == "human":
@@ -288,6 +345,14 @@ class ElevatorEnv(gym.Env):
         self.done=False
         self.passengerEnv.reset()
         self.observation=self.start_state
+
+        self.observation['location']=np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32)
+        self.reward=0
+        if self.passenger_mode=="random":
+            passenger_args=self.randomly_fix_passenger_args(self.tot_floor,self.passenger_num)
+            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+            self.observation['buttonsOut']=self.passengerEnv.get_buttonsOut()
+            self.observation['buttonsIn']=self.passengerEnv.get_buttonsIn()
         return self.observation,{"info":None}
         
     def step(self, action):
@@ -309,6 +374,7 @@ class ElevatorEnv(gym.Env):
         self.observation=next_state        
 
         reward=self.compute_reward(prev_state,action,next_state)
+        self.reward+=reward
         self.done = self.passengerEnv.all_arrived()
 
         return self.observation,reward,self.done,truncated,{"info":None}
