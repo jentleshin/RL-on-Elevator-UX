@@ -20,6 +20,9 @@ STEP_REWARD=-0.1
 ACCEL_REWARD=-1
 CURRIVAL_REWARD=10
 
+ZERO_FLOOR_DISTRIBUTION_FACTOR=0.1
+NORMAL_FLOOR_DISTRIBUTION_FACTOR=0.05
+
 class State(Enum):
     WAIT = 0
     ONBOARD = 1
@@ -121,52 +124,48 @@ class ElevatorEnv(gym.Env):
             "current_arrival":0
         }
 
-        ## initialize rendering
-        assert render_mode is None or render_mode in self.metadata["render_modes"]
-        self.render_mode = render_mode
-        self._init_render()
-
         ## initialize passenger mode
         assert passenger_mode in self.metadata["passenger_modes"]
         self.passenger_mode=passenger_mode
-        self.passenger_num=passenger_num
-        self.passenger_distribution_factor=np.zeros(tot_floor)
-    
-        if passenger_mode=="determined":
-            self.passengerEnv=PassengerEnv(self.tot_floor)
-        
-        elif passenger_mode=="randomly_fixed" or passenger_mode=="random_at_start":
-            passenger_args=self.randomly_fix_passenger_args(tot_floor,passenger_num)
-            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
-        
+        if passenger_mode=="randomly_fixed" or passenger_mode=="random_at_start":
+            self.passenger_num=passenger_num
+            passenger_args=self.randomly_fix_passenger_args()
         elif passenger_mode=="random_distribution":
-            for i in range(len(self.passenger_distribution_factor)):
-                self.passenger_distribution_factor[i]=NORMAL_FLOOR_DISTRIBUTION_FACTOR
-            self.passenger_distribution_factor[0]=ZERO_FLOOR_DISTRIBUTION_FACTOR
             passenger_args=self.random_distribution_passenger_args()
-            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+        self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
 
-    def randomly_fix_passenger_args(self,tot_floor,passenger_num):
-        passenger_args=[]
+        ## initialize rendering
+        assert render_mode in self.metadata["render_modes"]
+        self.render_mode = render_mode
+        self._init_render()
 
-        for i in range(passenger_num):
-            passenger_origin=np.random.randint(0,tot_floor)
-            passenger_dest=np.random.randint(0,tot_floor)
-            while passenger_dest==passenger_origin:
-                passenger_dest=np.random.randint(0,tot_floor)
-            passenger_args.append((passenger_origin,passenger_dest))
+    def randomly_fix_passenger_args(self):
+        passenger_args = [
+            (origin := np.random.randint(0, self.tot_floor), 
+            (dest := np.random.choice([i for i in range(self.tot_floor) if i != origin])), 0.0)
+            for _ in range(self.passenger_num)
+        ]
         return passenger_args
 
-    def probability_function(self,state):
-        return False
-    
+    def random_distribution_passenger_args(self):
+        self.passenger_distribution_factor = np.full(self.tot_floor, NORMAL_FLOOR_DISTRIBUTION_FACTOR)
+        self.passenger_distribution_factor[0] = ZERO_FLOOR_DISTRIBUTION_FACTOR
+        prob = np.random.rand(self.tot_floor)
+        passenger_args = [
+            (origin, 
+            (dest := np.random.choice([i for i in range(self.tot_floor) if i != origin])), self.T)   #self.T
+            for origin in range(self.tot_floor)
+            if prob[origin] < 1 - np.exp(-DELTA_T * self.passenger_distribution_factor[origin])
+        ]
+        return passenger_args
+
     def check_floor(self, location, velocity):
         location = location[0] / FLOOR_HEIGHT
         velocity = velocity[0]
-        if 0<=round(location) and round(location)<self.tot_floor and abs(round(location)-location)<FLOOR_RANGE and abs(velocity)<STOP_VEL_RANGE:
-            return True, round(location)
-        else:
-            return False, None
+        if 0<=round(location) and round(location)<self.tot_floor:
+            if abs(round(location)-location)<FLOOR_RANGE and abs(velocity)<STOP_VEL_RANGE:
+                return True, round(location)
+        return False, None
         
     def on_off_board(self, floor):
         current_arrival = self.passengerEnv.on_off_board(floor)
@@ -197,14 +196,13 @@ class ElevatorEnv(gym.Env):
         return reward
     
     def reset(self, seed=None, options=None):
-    # 환경 초기화
         self.done=False
         self.passengerEnv.reset()
         self.observation=self.start_state
-
         self.observation['location']=np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32)
         self.reward=0
-        if self.passenger_mode=="random":
+
+        if self.passenger_mode=="random_at_start":
             passenger_args=self.randomly_fix_passenger_args(self.tot_floor,self.passenger_num)
             self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
             self.observation['buttonsOut']=self.passengerEnv.get_buttonsOut()
@@ -214,6 +212,10 @@ class ElevatorEnv(gym.Env):
     def step(self, action):
         truncated=False
         
+        if self.passenger_mode=="random_distribution":
+            passenger_args=self.random_distribution_passenger_args()
+            self.passengerEnv.create(passenger_args)
+
         prev_state=self.observation
         next_state=copy.deepcopy(prev_state)
         
@@ -231,15 +233,13 @@ class ElevatorEnv(gym.Env):
         reward=self.compute_reward(prev_state,action,next_state)
         self.reward+=reward
         
-        self.done = self.passengerEnv.all_arrived()
+        if self.passenger_mode=="random_distribution":
+            self.done = False
+        else:
+            self.done = self.passengerEnv.all_arrived()
 
         return self.observation,reward,self.done,truncated,{"info":None}
     
-    def close(self):
-        if self.window is not None:
-            pygame.display.quit()
-            pygame.quit()
-
     def _init_render(self):
         pygame.font.init()
         self.font=pygame.font.Font('freesansbold.ttf',40)
@@ -396,3 +396,8 @@ class ElevatorEnv(gym.Env):
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
             )
+
+    def close(self):
+        if self.window is not None:
+            pygame.display.quit()
+            pygame.quit()
