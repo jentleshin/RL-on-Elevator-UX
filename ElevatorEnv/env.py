@@ -88,14 +88,16 @@ class PassengerEnv():
         self.__init__(self.tot_floor, self.passenger_args)
     
 class ElevatorEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_mode":["determined","randomly_fixed","random"]}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_modes":["determined","randomly_fixed","random"]}
     def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode="random",passenger_num=5):
-        self.render_mode = render_mode
 
-        ''' set observation space and action space '''
+        ## set floor range
+        self.tot_floor=tot_floor
         self.MIN_LOCATION = FLOOR_HEIGHT*(-EDGE_FLOOR_RANGE)
-        self.MAX_LOCATION = FLOOR_HEIGHT*(tot_floor-1+EDGE_FLOOR_RANGE)
+        self.MAX_LOCATION = FLOOR_HEIGHT*(self.tot_floor-1+EDGE_FLOOR_RANGE)
+        self.ALLOWED_LOCATION = FLOOR_HEIGHT*(self.tot_floor-1)
 
+        ## observation space & action space
         self.observation_space = spaces.Dict({
             "buttonsOut":spaces.MultiBinary(tot_floor),
             "buttonsIn":spaces.MultiBinary(tot_floor),
@@ -103,48 +105,38 @@ class ElevatorEnv(gym.Env):
             "velocity":spaces.Box(low=MIN_VELOCITY,high=MAX_VELOCITY)
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
-        self.reward=0
         
-        self.tot_floor=tot_floor
-        self.passenger_mode=passenger_mode
-        self.passenger_num=passenger_num
-        
-    
-        if passenger_mode=="determined":
-            self.passengerEnv=PassengerEnv(self.tot_floor)
-        
-        elif "random" in passenger_mode:
-            passenger_args=self.randomly_fix_passenger_args(tot_floor,passenger_num)
-            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
-
+        ## start state & terminal state
+        self.terminal_state = 0
         self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                      "buttonsIn":self.passengerEnv.get_buttonsIn(),
-                                     "location": np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32),
+                                     "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
                                      "velocity": np.array([0.0], dtype=np.float32)
                                      })
-
-        self.terminal_state = 0
+        
+        ## reward arguments
+        self.reward=0
         self.reward_args = {
             "accel_overload":0,
             "current_arrival":0
         }
 
+        ## initialize rendering
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
-        pygame.font.init()
-        self.font=pygame.font.Font('freesansbold.ttf',40)
-        self.numfont=pygame.font.Font('freesansbold.ttf',30)
+        self._init_render()
 
-        """
-        If human-rendering is used, `self.window` will be a reference
-        to the window that we draw to. `self.clock` will be a clock that is used
-        to ensure that the environment is rendered at the correct framerate in
-        human-mode. They will remain `None` until human-mode is used for the
-        first time.
-        """
-        self.window_size=900
-        self.window = None
-        self.clock = None
+        ## initialize passenger mode
+        assert passenger_mode in self.metadata["passenger_modes"]
+        self.passenger_mode=passenger_mode
+        self.passenger_num=passenger_num
+        
+        if self.passenger_mode=="determined":
+            self.passengerEnv=PassengerEnv(self.tot_floor)
+        
+        elif "random" in passenger_mode:
+            passenger_args=self.randomly_fix_passenger_args(tot_floor,passenger_num)
+            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
 
     def randomly_fix_passenger_args(self,tot_floor,passenger_num):
         passenger_args=[]
@@ -194,9 +186,69 @@ class ElevatorEnv(gym.Env):
         accel_overLoad, current_arrival = self.reward_args.values()
         reward = STEP_REWARD+(accel_overLoad)*ACCEL_REWARD+(current_arrival)*CURRIVAL_REWARD
         self.reward_args = {key: 0 for key in self.reward_args}
-        #print(f"{STEP_REWARD}, {(accel_overLoad)*ACCEL_REWARD}, {(bump_velocity)*BUMP_REWARD}, {(current_arrival)*CURRIVAL_REWARD}")
         return reward
     
+    def reset(self, seed=None, options=None):
+    # 환경 초기화
+        self.done=False
+        self.passengerEnv.reset()
+        self.observation=self.start_state
+
+        self.observation['location']=np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32)
+        self.reward=0
+        if self.passenger_mode=="random":
+            passenger_args=self.randomly_fix_passenger_args(self.tot_floor,self.passenger_num)
+            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+            self.observation['buttonsOut']=self.passengerEnv.get_buttonsOut()
+            self.observation['buttonsIn']=self.passengerEnv.get_buttonsIn()
+        return self.observation,{"info":None}
+        
+    def step(self, action):
+        truncated=False
+        
+        prev_state=self.observation
+        next_state=copy.deepcopy(prev_state)
+        
+        next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
+        next_state['velocity']+=DELTA_T*action
+        self.clip(next_state)
+        
+        is_floor,floor=self.check_floor(next_state["location"], next_state["velocity"])
+        if is_floor:
+            self.on_off_board(floor)
+            next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
+            next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
+        self.observation=next_state        
+
+        reward=self.compute_reward(prev_state,action,next_state)
+        self.reward+=reward
+        
+        self.done = self.passengerEnv.all_arrived()
+
+        return self.observation,reward,self.done,truncated,{"info":None}
+    
+    def close(self):
+        if self.window is not None:
+            pygame.display.quit()
+            pygame.quit()
+
+    def _init_render(self):
+        pygame.font.init()
+        self.font=pygame.font.Font('freesansbold.ttf',40)
+        self.numfont=pygame.font.Font('freesansbold.ttf',30)
+
+        """
+        If human-rendering is used, `self.window` will be a reference
+        to the window that we draw to. `self.clock` will be a clock that is used
+        to ensure that the environment is rendered at the correct framerate in
+        human-mode. They will remain `None` until human-mode is used for the
+        first time.
+        """
+        self.window_size=900
+        self.window = None
+        self.clock = None
+        return
+
     def render(self):
         if self.render_mode == "rgb_array":
             return self._render_frame()
@@ -336,47 +388,3 @@ class ElevatorEnv(gym.Env):
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
             )
-    
-    def reset(self, seed=None, options=None):
-    # 환경 초기화
-        self.done=False
-        self.passengerEnv.reset()
-        self.observation=self.start_state
-
-        self.observation['location']=np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32)
-        self.reward=0
-        if self.passenger_mode=="random":
-            passenger_args=self.randomly_fix_passenger_args(self.tot_floor,self.passenger_num)
-            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
-            self.observation['buttonsOut']=self.passengerEnv.get_buttonsOut()
-            self.observation['buttonsIn']=self.passengerEnv.get_buttonsIn()
-        return self.observation,{"info":None}
-        
-    def step(self, action):
-    # 주어진 동작을 위치로 마크를 배치
-    # elevator 1층, 최상층 범위 벗어나려 할때 reward needed
-        truncated=False
-        
-        prev_state=self.observation
-        next_state=copy.deepcopy(prev_state)
-        next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
-        next_state['velocity']+=DELTA_T*action
-        self.clip(next_state)
-        
-        is_floor,floor=self.check_floor(next_state["location"], next_state["velocity"])
-        if is_floor:
-            self.on_off_board(floor)
-            next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
-            next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
-        self.observation=next_state        
-
-        reward=self.compute_reward(prev_state,action,next_state)
-        self.reward+=reward
-        self.done = self.passengerEnv.all_arrived()
-
-        return self.observation,reward,self.done,truncated,{"info":None}
-    
-    def close(self):
-        if self.window is not None:
-            pygame.display.quit()
-            pygame.quit()
