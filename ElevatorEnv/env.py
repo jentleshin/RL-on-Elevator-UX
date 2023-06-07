@@ -221,6 +221,7 @@ class ElevatorEnv(gym.Env):
 
         floor_pixel_size=(self.window_size-pix_square_size)/(self.tot_floor-1)
         borderLine_thickness=floor_pixel_size*FLOOR_RANGE
+
         # First we draw the target
         for i in range(self.tot_floor):
             pygame.draw.rect(

@@ -13,7 +13,11 @@ def main(args):
     
     if args.mode == "train":
         vec_env = make_vec_env('Elevator-v0', n_envs=8)
-        model = PPO('MultiInputPolicy', vec_env, verbose=1)
+        if args.load == "None":
+            model = PPO('MultiInputPolicy', vec_env, verbose=1)
+        else:
+            model = PPO.load(f"./checkpoint/{args.load}")
+            model.set_env(vec_env)
         model.learn(total_timesteps=args.timesteps)
         model.save(f"./checkpoint/{args.checkpoint}")
         print("Successfully saved trained model!")
@@ -57,6 +61,7 @@ if __name__ == "__main__":
     # Subparser for the "train" mode
     train_parser = subparsers.add_parser("train")
     train_parser.add_argument("--timesteps", type=int, default=250000)
+    train_parser.add_argument("--load", type=str, default="None")
     train_parser.add_argument("--checkpoint", type=str, default="recent")
 
     # Subparser for the "test" mode
