@@ -87,12 +87,18 @@ class PassengerEnv():
     def all_arrived(self):
         return all(passenger.state==State.ARRIVAL for passenger in self.passengers)
     
-    def reset(self):
-        self.__init__(self.tot_floor, self.passenger_args)
+    def reset(self, passenger_args=None):
+        if passenger_args == None:
+            self.__init__(self.tot_floor, self.passenger_args)
+        else:
+            self.__init__(self.tot_floor, passenger_args)
+        return
     
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_mode":["determined","randomly_fixed","random_at_start","random_distribution"]}
     def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode="random",passenger_num=5):
+        
+        self.T = 0.0
 
         ## set floor range
         self.tot_floor=tot_floor
@@ -124,7 +130,7 @@ class ElevatorEnv(gym.Env):
             "current_arrival":0
         }
 
-        ## initialize passenger mode
+        ## initialize passengerEnv
         assert passenger_mode in self.metadata["passenger_modes"]
         self.passenger_mode=passenger_mode
         if passenger_mode=="randomly_fixed" or passenger_mode=="random_at_start":
@@ -153,7 +159,7 @@ class ElevatorEnv(gym.Env):
         prob = np.random.rand(self.tot_floor)
         passenger_args = [
             (origin, 
-            (dest := np.random.choice([i for i in range(self.tot_floor) if i != origin])), self.T)   #self.T
+            (dest := np.random.choice([i for i in range(self.tot_floor) if i != origin])), self.T)
             for origin in range(self.tot_floor)
             if prob[origin] < 1 - np.exp(-DELTA_T * self.passenger_distribution_factor[origin])
         ]
@@ -196,22 +202,26 @@ class ElevatorEnv(gym.Env):
         return reward
     
     def reset(self, seed=None, options=None):
-        self.done=False
-        self.passengerEnv.reset()
-        self.observation=self.start_state
-        self.observation['location']=np.array([np.random.rand()*(self.tot_floor-1)*FLOOR_HEIGHT], dtype=np.float32)
+        self.T = 0.0
         self.reward=0
+        self.done=False
 
         if self.passenger_mode=="random_at_start":
-            passenger_args=self.randomly_fix_passenger_args(self.tot_floor,self.passenger_num)
-            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
-            self.observation['buttonsOut']=self.passengerEnv.get_buttonsOut()
-            self.observation['buttonsIn']=self.passengerEnv.get_buttonsIn()
+            passenger_args=self.randomly_fix_passenger_args()
+            self.passengerEnv.reset(passenger_args)
+        else: 
+            self.passengerEnv.reset()
+        
+        self.observation = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
+                                "buttonsIn":self.passengerEnv.get_buttonsIn(),
+                                "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
+                                "velocity": np.array([0.0], dtype=np.float32)
+                                })
         return self.observation,{"info":None}
         
     def step(self, action):
-        truncated=False
-        
+        self.T+=DELTA_T
+
         if self.passenger_mode=="random_distribution":
             passenger_args=self.random_distribution_passenger_args()
             self.passengerEnv.create(passenger_args)
@@ -238,7 +248,7 @@ class ElevatorEnv(gym.Env):
         else:
             self.done = self.passengerEnv.all_arrived()
 
-        return self.observation,reward,self.done,truncated,{"info":None}
+        return self.observation,reward,self.done,False,{"info":None}
     
     def _init_render(self):
         pygame.font.init()
