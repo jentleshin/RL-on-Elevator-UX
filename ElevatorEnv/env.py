@@ -88,7 +88,7 @@ class PassengerEnv():
         self.__init__(self.tot_floor, self.passenger_args)
     
 class ElevatorEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_modes":["determined","randomly_fixed","random"]}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_mode":["determined","randomly_fixed","random_at_start","random_distribution"]}
     def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode="random",passenger_num=5):
 
         ## set floor range
@@ -130,12 +130,20 @@ class ElevatorEnv(gym.Env):
         assert passenger_mode in self.metadata["passenger_modes"]
         self.passenger_mode=passenger_mode
         self.passenger_num=passenger_num
-        
-        if self.passenger_mode=="determined":
+        self.passenger_distribution_factor=np.zeros(tot_floor)
+    
+        if passenger_mode=="determined":
             self.passengerEnv=PassengerEnv(self.tot_floor)
         
-        elif "random" in passenger_mode:
+        elif passenger_mode=="randomly_fixed" or passenger_mode=="random_at_start":
             passenger_args=self.randomly_fix_passenger_args(tot_floor,passenger_num)
+            self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+        
+        elif passenger_mode=="random_distribution":
+            for i in range(len(self.passenger_distribution_factor)):
+                self.passenger_distribution_factor[i]=NORMAL_FLOOR_DISTRIBUTION_FACTOR
+            self.passenger_distribution_factor[0]=ZERO_FLOOR_DISTRIBUTION_FACTOR
+            passenger_args=self.random_distribution_passenger_args()
             self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
 
     def randomly_fix_passenger_args(self,tot_floor,passenger_num):
