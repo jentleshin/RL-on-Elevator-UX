@@ -95,8 +95,8 @@ class PassengerEnv():
         return
     
 class ElevatorEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_mode":["determined","randomly_fixed","random_at_start","random_distribution"]}
-    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode="random",passenger_num=5):
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_modes":["determined","randomly_fixed","random_at_start","random_distribution"]}
+    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode="random_distribution",passenger_num=5):
         
         self.T = 0.0
 
@@ -115,6 +115,16 @@ class ElevatorEnv(gym.Env):
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
         
+        ## initialize passengerEnv
+        assert passenger_mode in self.metadata["passenger_modes"]
+        self.passenger_mode=passenger_mode
+        if passenger_mode=="randomly_fixed" or passenger_mode=="random_at_start":
+            self.passenger_num=passenger_num
+            passenger_args=self.randomly_fix_passenger_args()
+        elif passenger_mode=="random_distribution":
+            passenger_args=self.random_distribution_passenger_args()
+        self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+
         ## start state & terminal state
         self.terminal_state = 0
         self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
@@ -129,16 +139,6 @@ class ElevatorEnv(gym.Env):
             "accel_overload":0,
             "current_arrival":0
         }
-
-        ## initialize passengerEnv
-        assert passenger_mode in self.metadata["passenger_modes"]
-        self.passenger_mode=passenger_mode
-        if passenger_mode=="randomly_fixed" or passenger_mode=="random_at_start":
-            self.passenger_num=passenger_num
-            passenger_args=self.randomly_fix_passenger_args()
-        elif passenger_mode=="random_distribution":
-            passenger_args=self.random_distribution_passenger_args()
-        self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
 
         ## initialize rendering
         assert render_mode in self.metadata["render_modes"]
