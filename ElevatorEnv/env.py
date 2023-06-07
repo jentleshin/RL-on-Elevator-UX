@@ -11,8 +11,8 @@ MAX_VELOCITY=100.0
 MIN_VELOCITY=-MAX_VELOCITY
 DELTA_T=0.1
 
-FLOOR_RANGE=0.2
-EDGE_FLOOR_RANGE=1
+FLOOR_RANGE=0.1
+EDGE_FLOOR_RANGE=0.3
 STOP_VEL_RANGE=0.1
 ACCEL_THRESHOLD=5
 
@@ -89,7 +89,7 @@ class PassengerEnv():
     
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_mode":["determined","randomly_fixed","random"]}
-    def __init__(self, render_mode="rgb_array",tot_floor=5, passenger_mode="random",passenger_num=5):
+    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode="random",passenger_num=5):
         self.render_mode = render_mode
 
         ''' set observation space and action space '''
@@ -220,7 +220,8 @@ class ElevatorEnv(gym.Env):
         elevator_width=elevator_height/2
 
         floor_pixel_size=(self.window_size-pix_square_size)/(self.tot_floor-1)
-        borderLine_thickness=floor_pixel_size * FLOOR_RANGE
+        borderLine_thickness=floor_pixel_size*FLOOR_RANGE
+
         # First we draw the target
         for i in range(self.tot_floor):
             pygame.draw.rect(
