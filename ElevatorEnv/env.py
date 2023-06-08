@@ -48,6 +48,7 @@ class Passenger():
         self.dest=dest
         self.state = None
         self.creation_time=creation_time
+        self.onboarding_time=None
         self.expected_arrival_time=self.normal_elevator_arrival_baseline()
     
     def normal_elevator_arrival_baseline(self):
@@ -91,13 +92,14 @@ class PassengerEnv():
         for passenger in self.waiting[floor]:
             passenger.state = State.ONBOARD
             self.onboarding[passenger.dest].append(passenger)
+            passenger.onboarding_time = T
         self.waiting[floor]=[]
 
         current_arrival = len(self.onboarding[floor])
         for passenger in self.onboarding[floor]:
             passenger.state = State.ARRIVAL
-            tot_delayed_time+=T-passenger.expected_arrival_time
             self.arrived[floor].append(passenger)
+            tot_delayed_time+=(T-passenger.onboarding_time)-passenger.expected_arrival_time
         self.onboarding[floor]=[]
         return current_arrival, tot_delayed_time
     
@@ -115,7 +117,8 @@ class PassengerEnv():
 class BasicElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_modes":["determined","randomly_fixed","random_at_start","random_distribution"]}
     def __init__(self, render_mode="rgb_array",tot_floor=5, passenger_mode="random_distribution",passenger_num=5):
-        
+        self.T=0.0
+
         ## set floor range
         self.tot_floor=tot_floor
         self.MIN_LOCATION = FLOOR_HEIGHT*(-EDGE_FLOOR_RANGE)
@@ -131,8 +134,7 @@ class BasicElevatorEnv(gym.Env):
             "onFloor": spaces.Discrete(2)
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
-        self.action=0
-        self.T=0.0
+        
         ## initialize passengerEnv
         assert passenger_mode in self.metadata["passenger_modes"]
         self.passenger_mode=passenger_mode
@@ -144,7 +146,6 @@ class BasicElevatorEnv(gym.Env):
         self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
               
         ## reward arguments
-        self.cummulative_reward=0
         self.reward_args = {
             "accel_overload":0,
             "current_arrival":0,
@@ -152,7 +153,7 @@ class BasicElevatorEnv(gym.Env):
             "tot_delayed_time":0
         }
 
-        
+        ## start_state
         self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                      "buttonsIn":self.passengerEnv.get_buttonsIn(),
                                      "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
@@ -161,6 +162,9 @@ class BasicElevatorEnv(gym.Env):
                                      })
         self.start_state["onFloor"] = self.check_floor(self.start_state["location"], self.start_state["velocity"])[0]
 
+        ## for renderging purpose
+        self.action=0
+        self.cummulative_reward=0
         ## initialize rendering
         assert render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -558,15 +562,19 @@ class ElevatorEnv(BasicElevatorEnv):
         return reward
     
     def reset(self, seed=None, options=None):
-        self.cummulative_reward=0
         self.T=0.0
+        ## for rendering
+        self.cummulative_reward=0
         self.action=0
+
+        ## reset passengerEnv
         if self.passenger_mode=="random_at_start":
             passenger_args=self.randomly_fix_passenger_args()
             self.passengerEnv.reset(passenger_args)
         else: 
             self.passengerEnv.reset()
         
+        ## reset self.observation
         self.observation = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                 "buttonsIn":self.passengerEnv.get_buttonsIn(),
                                 "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
@@ -578,20 +586,22 @@ class ElevatorEnv(BasicElevatorEnv):
         
     def step(self, action):
         
-        self.action=action[0]
         prev_state=self.observation
         next_state=copy.deepcopy(prev_state)
         
+        ## update location and velocity
         next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
         self.clip(next_state)
 
+        # create random passenger
         if self.passenger_mode=="random_distribution":
             passenger_args=self.random_distribution_passenger_args()
             self.passengerEnv.create(passenger_args)
             next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
             next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
         
+        ## check floor
         on_floor, stop_on_floor, floor=self.check_floor(next_state["location"], next_state["velocity"])
         next_state["onFloor"] = on_floor
         if stop_on_floor:
@@ -600,14 +610,20 @@ class ElevatorEnv(BasicElevatorEnv):
             next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
         self.observation=next_state        
         self.T+=DELTA_T
-        reward=self.compute_reward(prev_state,action,next_state)
-        self.cummulative_reward+=reward
         
+        ## reward
+        reward=self.compute_reward(prev_state,action,next_state)
+        
+        ## done
         if self.passenger_mode=="random_distribution":
             done = False
         else:
             done = self.passengerEnv.all_arrived()
 
+        ## for rendering
+        self.cummulative_reward+=reward
+        self.action=action[0]
+        
         return self.observation,reward,done,False,{"info":None}
     
     def _init_render(self):
