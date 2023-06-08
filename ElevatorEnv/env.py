@@ -110,7 +110,8 @@ class ElevatorEnv(gym.Env):
             "buttonsOut":spaces.MultiBinary(tot_floor),
             "buttonsIn":spaces.MultiBinary(tot_floor),
             "location":spaces.Box(low=self.MIN_LOCATION,high=self.MAX_LOCATION),
-            "velocity":spaces.Box(low=MIN_VELOCITY,high=MAX_VELOCITY)
+            "velocity":spaces.Box(low=MIN_VELOCITY,high=MAX_VELOCITY),
+            "onFloor": spaces.Discrete(2)
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
         
@@ -123,22 +124,24 @@ class ElevatorEnv(gym.Env):
         elif passenger_mode=="random_distribution":
             passenger_args=self.random_distribution_passenger_args()
         self.passengerEnv=PassengerEnv(self.tot_floor,passenger_args)
+              
+        ## reward arguments
+        self.cummulative_reward=0
+        self.reward_args = {
+            "accel_overload":0,
+            "current_arrival":0,
+            "non_stop":0
+        }
 
         ## start state & terminal state
         self.terminal_state = 0
         self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                      "buttonsIn":self.passengerEnv.get_buttonsIn(),
                                      "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
-                                     "velocity": np.array([0.0], dtype=np.float32)
+                                     "velocity": np.array([0.0], dtype=np.float32),
+                                     "onFloor": None
                                      })
-        
-        ## reward arguments
-        self.reward=0
-        self.reward_args = {
-            "accel_overload":0,
-            "current_arrival":0,
-            "non_stop":0
-        }
+        self.start_state["onFloor"] = self.check_floor(self.start_state["location"], self.start_state["velocity"])[0]
 
         ## initialize rendering
         assert render_mode in self.metadata["render_modes"]
@@ -173,12 +176,14 @@ class ElevatorEnv(gym.Env):
         round_location = round(location)
         velocity = velocity[0]
         if 0<=round_location and round_location<self.tot_floor and abs(round_location-location)<FLOOR_RANGE:
+            on_floor = 1
             if abs(velocity)<STOP_VEL_RANGE:
-                return True, round(location)
+                return on_floor, True, round(location)
         else:
+            on_floor = 0
             if abs(velocity)<(STOP_VEL_RANGE/2):
                 self.reward_args["non_stop"] = (STOP_VEL_RANGE/2) - abs(velocity)
-        return False, None 
+        return on_floor, False, None 
         
     def on_off_board(self, floor):
         current_arrival = self.passengerEnv.on_off_board(floor)
@@ -204,15 +209,12 @@ class ElevatorEnv(gym.Env):
     def compute_reward(self, prev_state, action, next_state):
         self.reward_args["accel_overload"] = self.accel_relu(action)
         accel_overLoad, current_arrival, non_stop = self.reward_args.values()
-        reward = (current_arrival)*CURRIVAL_REWARD+(non_stop)*NONSTOP_REWARD
-        #reward = (current_arrival)*CURRIVAL_REWARD
+        reward = (current_arrival)*CURRIVAL_REWARD#+(non_stop)*NONSTOP_REWARD
         self.reward_args = {key: 0 for key in self.reward_args}
         return reward
     
     def reset(self, seed=None, options=None):
-        self.reward=0
-        self.done=False
-
+        self.cummulative_reward=0
         if self.passenger_mode=="random_at_start":
             passenger_args=self.randomly_fix_passenger_args()
             self.passengerEnv.reset(passenger_args)
@@ -222,8 +224,10 @@ class ElevatorEnv(gym.Env):
         self.observation = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                 "buttonsIn":self.passengerEnv.get_buttonsIn(),
                                 "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
-                                "velocity": np.array([0.0], dtype=np.float32)
+                                "velocity": np.array([0.0], dtype=np.float32),
+                                "onFloor": None
                                 })
+        self.observation["onFloor"] = self.check_floor(self.start_state["location"], self.start_state["velocity"])[0]
         return self.observation,{"info":None}
         
     def step(self, action):
@@ -238,22 +242,23 @@ class ElevatorEnv(gym.Env):
         next_state['velocity']+=DELTA_T*action
         self.clip(next_state)
         
-        is_floor,floor=self.check_floor(next_state["location"], next_state["velocity"])
-        if is_floor:
+        on_floor, stop_on_floor, floor=self.check_floor(next_state["location"], next_state["velocity"])
+        next_state["onFloor"] = on_floor
+        if stop_on_floor:
             self.on_off_board(floor)
             next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
             next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
         self.observation=next_state        
 
         reward=self.compute_reward(prev_state,action,next_state)
-        self.reward+=reward
+        self.cummulative_reward+=reward
         
         if self.passenger_mode=="random_distribution":
-            self.done = False
+            done = False
         else:
-            self.done = self.passengerEnv.all_arrived()
+            done = self.passengerEnv.all_arrived()
 
-        return self.observation,reward,self.done,False,{"info":None}
+        return self.observation,reward,done,False,{"info":None}
     
     def _init_render(self):
         pygame.font.init()
@@ -392,7 +397,7 @@ class ElevatorEnv(gym.Env):
         loc_text_rect.center=(150,40)
         canvas.blit(loc_text,loc_text_rect)
 
-        rew_text=self.font.render("rew : "+str(round(self.reward,2)),True,(0,0,0))
+        rew_text=self.font.render("rew : "+str(round(self.cummulative_reward,2)),True,(0,0,0))
         rew_text_rect=rew_text.get_rect()
         rew_text_rect.center=(800,40)
         canvas.blit(rew_text,rew_text_rect)
