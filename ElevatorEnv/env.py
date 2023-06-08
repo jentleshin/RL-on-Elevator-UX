@@ -22,8 +22,8 @@ CURRIVAL_REWARD=10
 WAITING_TIME_REWARD=-0.1
 DELAYED_TIME_REWARD=-0.1
 
-ZERO_FLOOR_DISTRIBUTION_FACTOR=0.1
-NORMAL_FLOOR_DISTRIBUTION_FACTOR=0.05
+ZERO_FLOOR_DISTRIBUTION_FACTOR=10#0.1
+NORMAL_FLOOR_DISTRIBUTION_FACTOR=10#0.05
 
 class State(Enum):
     WAIT = 0
@@ -480,7 +480,7 @@ class ElevatorEnv(BasicElevatorEnv):
         
         self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                      "buttonsIn":self.passengerEnv.get_buttonsIn(),
-                                     "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
+                                     "location": np.array([np.random.randint(self.tot_floor)], dtype=np.float32),
                                      "velocity": np.array([0.0], dtype=np.float32),
                                      "onFloor": None
                                      })
@@ -569,7 +569,7 @@ class ElevatorEnv(BasicElevatorEnv):
         
         self.observation = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                 "buttonsIn":self.passengerEnv.get_buttonsIn(),
-                                "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
+                                "location": np.array([np.random.randint(self.tot_floor)], dtype=np.float32),
                                 "velocity": np.array([0.0], dtype=np.float32),
                                 "onFloor": None
                                 })

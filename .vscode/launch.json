@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             //"args": ["train"]
-            "args": ["test"]
+            "args": ["baseline"]
         }
     ]
 }
