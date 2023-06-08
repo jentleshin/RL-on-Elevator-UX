@@ -53,7 +53,7 @@ class Passenger():
     
     def normal_elevator_arrival_baseline(self):
         distance=abs(self.origin-self.dest)*FLOOR_HEIGHT
-        return np.sqrt(distance/ACCEL_THRESHOLD)
+        return np.sqrt(4*distance/ACCEL_THRESHOLD)
 
 class PassengerEnv():
     def __init__(self, tot_floor, passenger_args=[(2,0,0.0),(1,0,0.0)]):
@@ -166,29 +166,6 @@ class BasicElevatorEnv(gym.Env):
         assert render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
         self._init_render()
-    
-    def randomly_fix_passenger_args(self):
-        passenger_args=[]
-        for i in range(self.passenger_num):
-            passenger_origin=np.random.randint(0,self.tot_floor)
-            passenger_dest=np.random.randint(0,self.tot_floor)
-            while passenger_dest==passenger_origin:
-                passenger_dest=np.random.randint(0,self.tot_floor)
-            passenger_args.append((passenger_origin,passenger_dest,0.0))
-        return passenger_args
-
-    def random_distribution_passenger_args(self):
-        passenger_distribution_factor = np.full(self.tot_floor, NORMAL_FLOOR_DISTRIBUTION_FACTOR)
-        passenger_distribution_factor[0] = ZERO_FLOOR_DISTRIBUTION_FACTOR
-        passenger_args=[]
-        prob=np.random.rand(self.tot_floor)
-        for origin in range(self.tot_floor):
-            if prob[origin]<1-np.exp(-DELTA_T*passenger_distribution_factor[origin]):
-                passenger_dest=np.random.randint(0,self.tot_floor)
-                while passenger_dest==origin:
-                    passenger_dest=np.random.randint(0,self.tot_floor)
-                passenger_args.append((origin,passenger_dest,self.T))
-        return passenger_args
 
     def check_floor(self, location, velocity):
         location = location[0] / FLOOR_HEIGHT
