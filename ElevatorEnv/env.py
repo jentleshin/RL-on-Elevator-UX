@@ -230,10 +230,7 @@ class ElevatorEnv(gym.Env):
         self.observation["onFloor"] = self.check_floor(self.start_state["location"], self.start_state["velocity"])[0]
         return self.observation,{"info":None}
         
-    def step(self, action):
-        if self.passenger_mode=="random_distribution":
-            passenger_args=self.random_distribution_passenger_args()
-            self.passengerEnv.create(passenger_args)
+    def step(self, action):                
 
         prev_state=self.observation
         next_state=copy.deepcopy(prev_state)
@@ -241,7 +238,13 @@ class ElevatorEnv(gym.Env):
         next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
         self.clip(next_state)
-        
+
+        if self.passenger_mode=="random_distribution":
+            passenger_args=self.random_distribution_passenger_args()
+            self.passengerEnv.create(passenger_args)
+            next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
+            next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
+
         on_floor, stop_on_floor, floor=self.check_floor(next_state["location"], next_state["velocity"])
         next_state["onFloor"] = on_floor
         if stop_on_floor:
