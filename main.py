@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # Subparser for the "train" mode
     train_parser = subparsers.add_parser("train")
-    train_parser.add_argument("--timesteps", type=int, default=250000)
+    train_parser.add_argument("--timesteps", type=int, default=1000000)
     train_parser.add_argument("--load", type=str, default="None")
     train_parser.add_argument("--checkpoint", type=str, default="recent")
 

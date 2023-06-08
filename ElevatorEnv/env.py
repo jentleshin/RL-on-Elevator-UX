@@ -20,6 +20,8 @@ STEP_REWARD=-0.1
 ACCEL_REWARD=-1
 NONSTOP_REWARD=-1
 CURRIVAL_REWARD=10
+WAITING_TIME_REWARD=-0.1
+DELAYED_TIME_REWARD=-0.1
 
 ZERO_FLOOR_DISTRIBUTION_FACTOR=0.1
 NORMAL_FLOOR_DISTRIBUTION_FACTOR=0.05
@@ -30,7 +32,7 @@ class State(Enum):
     ARRIVAL = 2
 
 class Passenger():
-    def __init__(self, origin, dest):
+    def __init__(self, origin, dest,creation_time):
         """
         An initialization function
 
@@ -46,9 +48,15 @@ class Passenger():
         self.origin=origin
         self.dest=dest
         self.state = None
+        self.creation_time=creation_time
+        self.expected_arrival_time=self.normal_elevator_arrival_baseline()
+    
+    def normal_elevator_arrival_baseline(self):
+        distance=abs(self.origin-self.dest)*FLOOR_HEIGHT
+        return np.sqrt(distance/ACCEL_THRESHOLD)
 
 class PassengerEnv():
-    def __init__(self, tot_floor, passenger_args=[(2,0),(1,0)]):
+    def __init__(self, tot_floor, passenger_args=[(2,0,0.0),(1,0,0.0)]):
         self.passengers=list()
         self.tot_floor = tot_floor
         self.passenger_args = passenger_args
@@ -72,7 +80,15 @@ class PassengerEnv():
     def get_buttonsOut(self):
         return np.array([bool(value) for value in self.waiting.values()])
     
-    def on_off_board(self,floor):
+    def waiting_passengers(self,tot_floor):
+        num=0
+        for floor in range(tot_floor):
+            for passenger in self.waiting[floor]:
+                num+=1
+        return num
+
+    def on_off_board(self,floor,T):
+        tot_delayed_time=0.0
         for passenger in self.waiting[floor]:
             passenger.state = State.ONBOARD
             self.onboarding[passenger.dest].append(passenger)
@@ -81,9 +97,10 @@ class PassengerEnv():
         current_arrival = len(self.onboarding[floor])
         for passenger in self.onboarding[floor]:
             passenger.state = State.ARRIVAL
+            tot_delayed_time+=T-passenger.expected_arrival_time
             self.arrived[floor].append(passenger)
         self.onboarding[floor]=[]
-        return current_arrival
+        return current_arrival, tot_delayed_time
     
     def all_arrived(self):
         return all(passenger.state==State.ARRIVAL for passenger in self.passengers)
@@ -114,7 +131,7 @@ class ElevatorEnv(gym.Env):
             "onFloor": spaces.Discrete(2)
             })
         self.action_space = spaces.Box(low=-10.0,high=10.0,dtype=np.float32)
-        
+        self.T=0.0
         ## initialize passengerEnv
         assert passenger_mode in self.metadata["passenger_modes"]
         self.passenger_mode=passenger_mode
@@ -130,11 +147,11 @@ class ElevatorEnv(gym.Env):
         self.reward_args = {
             "accel_overload":0,
             "current_arrival":0,
-            "non_stop":0
+            "non_stop":0,
+            "tot_delayed_time":0
         }
 
-        ## start state & terminal state
-        self.terminal_state = 0
+        
         self.start_state = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                      "buttonsIn":self.passengerEnv.get_buttonsIn(),
                                      "location": np.array([np.random.rand()*self.ALLOWED_LOCATION], dtype=np.float32),
@@ -168,7 +185,7 @@ class ElevatorEnv(gym.Env):
                 passenger_dest=np.random.randint(0,self.tot_floor)
                 while passenger_dest==origin:
                     passenger_dest=np.random.randint(0,self.tot_floor)
-                passenger_args.append((origin,passenger_dest))
+                passenger_args.append((origin,passenger_dest,self.T))
         return passenger_args
 
     def check_floor(self, location, velocity):
@@ -186,8 +203,9 @@ class ElevatorEnv(gym.Env):
         return on_floor, False, None 
         
     def on_off_board(self, floor):
-        current_arrival = self.passengerEnv.on_off_board(floor)
+        current_arrival , tot_delayed_time= self.passengerEnv.on_off_board(floor,self.T)
         self.reward_args["current_arrival"] = current_arrival
+        self.reward_args["tot_delayed_time"]=tot_delayed_time
         return
 
     def clip(self, state):
@@ -208,13 +226,14 @@ class ElevatorEnv(gym.Env):
         
     def compute_reward(self, prev_state, action, next_state):
         self.reward_args["accel_overload"] = self.accel_relu(action)
-        accel_overLoad, current_arrival, non_stop = self.reward_args.values()
-        reward = (current_arrival)*CURRIVAL_REWARD#+(non_stop)*NONSTOP_REWARD
+        accel_overLoad, current_arrival, non_stop, tot_delayed_time= self.reward_args.values()
+        reward = (current_arrival)*CURRIVAL_REWARD+(non_stop)*NONSTOP_REWARD#+(tot_delayed_time)*DELAYED_TIME_REWARD+self.passengerEnv.waiting_passengers(self.tot_floor)*WAITING_TIME_REWARD*DELTA_T
         self.reward_args = {key: 0 for key in self.reward_args}
         return reward
     
     def reset(self, seed=None, options=None):
         self.cummulative_reward=0
+        self.T=0.0
         if self.passenger_mode=="random_at_start":
             passenger_args=self.randomly_fix_passenger_args()
             self.passengerEnv.reset(passenger_args)
@@ -231,9 +250,7 @@ class ElevatorEnv(gym.Env):
         return self.observation,{"info":None}
         
     def step(self, action):
-        if self.passenger_mode=="random_distribution":
-            passenger_args=self.random_distribution_passenger_args()
-            self.passengerEnv.create(passenger_args)
+        
 
         prev_state=self.observation
         next_state=copy.deepcopy(prev_state)
@@ -241,6 +258,12 @@ class ElevatorEnv(gym.Env):
         next_state["location"]+=DELTA_T*next_state['velocity']+0.5*action*pow(DELTA_T,2)
         next_state['velocity']+=DELTA_T*action
         self.clip(next_state)
+
+        if self.passenger_mode=="random_distribution":
+            passenger_args=self.random_distribution_passenger_args()
+            self.passengerEnv.create(passenger_args)
+            next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
+            next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
         
         on_floor, stop_on_floor, floor=self.check_floor(next_state["location"], next_state["velocity"])
         next_state["onFloor"] = on_floor
@@ -249,7 +272,7 @@ class ElevatorEnv(gym.Env):
             next_state['buttonsOut']=self.passengerEnv.get_buttonsOut()
             next_state['buttonsIn']=self.passengerEnv.get_buttonsIn()
         self.observation=next_state        
-
+        self.T+=DELTA_T
         reward=self.compute_reward(prev_state,action,next_state)
         self.cummulative_reward+=reward
         
