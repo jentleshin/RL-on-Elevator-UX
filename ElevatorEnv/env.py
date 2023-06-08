@@ -12,12 +12,13 @@ MIN_VELOCITY=-MAX_VELOCITY
 DELTA_T=0.1
 
 FLOOR_RANGE=0.1
-EDGE_FLOOR_RANGE=0.3
+EDGE_FLOOR_RANGE=1
 STOP_VEL_RANGE=0.1
 ACCEL_THRESHOLD=5
 
 STEP_REWARD=-0.1
 ACCEL_REWARD=-1
+NONSTOP_REWARD=-1
 CURRIVAL_REWARD=10
 
 ZERO_FLOOR_DISTRIBUTION_FACTOR=0.1
@@ -56,14 +57,14 @@ class PassengerEnv():
         self.onboarding = {i: [] for i in range(tot_floor)}
         self.arrived = {i: [] for i in range(tot_floor)}
         
-        for passenger_arg in self.passenger_args:
-            self.create(passenger_arg)
+        self.create(passenger_args)
     
     def create(self, passenger_args):
-        passenger = Passenger(*passenger_args)
-        passenger.state = State.WAIT
-        self.waiting[passenger.origin].append(passenger)
-        self.passengers.append(passenger)
+        for passenger_arg in passenger_args:
+            passenger = Passenger(*passenger_arg)
+            passenger.state = State.WAIT
+            self.waiting[passenger.origin].append(passenger)
+            self.passengers.append(passenger)
 
     def get_buttonsIn(self):
         return np.array([bool(value) for value in self.onboarding.values()])
@@ -96,10 +97,8 @@ class PassengerEnv():
     
 class ElevatorEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4, "passenger_modes":["determined","randomly_fixed","random_at_start","random_distribution"]}
-    def __init__(self, render_mode="rgb_array",tot_floor=3, passenger_mode="random_distribution",passenger_num=5):
+    def __init__(self, render_mode="rgb_array",tot_floor=5, passenger_mode="random_distribution",passenger_num=5):
         
-        self.T = 0.0
-
         ## set floor range
         self.tot_floor=tot_floor
         self.MIN_LOCATION = FLOOR_HEIGHT*(-EDGE_FLOOR_RANGE)
@@ -137,41 +136,49 @@ class ElevatorEnv(gym.Env):
         self.reward=0
         self.reward_args = {
             "accel_overload":0,
-            "current_arrival":0
+            "current_arrival":0,
+            "non_stop":0
         }
 
         ## initialize rendering
         assert render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
         self._init_render()
-
+    
     def randomly_fix_passenger_args(self):
-        passenger_args = [
-            (origin := np.random.randint(0, self.tot_floor), 
-            (dest := np.random.choice([i for i in range(self.tot_floor) if i != origin])), 0.0)
-            for _ in range(self.passenger_num)
-        ]
+        passenger_args=[]
+        for i in range(self.passenger_num):
+            passenger_origin=np.random.randint(0,self.tot_floor)
+            passenger_dest=np.random.randint(0,self.tot_floor)
+            while passenger_dest==passenger_origin:
+                passenger_dest=np.random.randint(0,self.tot_floor)
+            passenger_args.append((passenger_origin,passenger_dest,0.0))
         return passenger_args
 
     def random_distribution_passenger_args(self):
-        self.passenger_distribution_factor = np.full(self.tot_floor, NORMAL_FLOOR_DISTRIBUTION_FACTOR)
-        self.passenger_distribution_factor[0] = ZERO_FLOOR_DISTRIBUTION_FACTOR
-        prob = np.random.rand(self.tot_floor)
-        passenger_args = [
-            (origin, 
-            (dest := np.random.choice([i for i in range(self.tot_floor) if i != origin])), self.T)
-            for origin in range(self.tot_floor)
-            if prob[origin] < 1 - np.exp(-DELTA_T * self.passenger_distribution_factor[origin])
-        ]
+        passenger_distribution_factor = np.full(self.tot_floor, NORMAL_FLOOR_DISTRIBUTION_FACTOR)
+        passenger_distribution_factor[0] = ZERO_FLOOR_DISTRIBUTION_FACTOR
+        passenger_args=[]
+        prob=np.random.rand(self.tot_floor)
+        for origin in range(self.tot_floor):
+            if prob[origin]<1-np.exp(-DELTA_T*passenger_distribution_factor[origin]):
+                passenger_dest=np.random.randint(0,self.tot_floor)
+                while passenger_dest==origin:
+                    passenger_dest=np.random.randint(0,self.tot_floor)
+                passenger_args.append((origin,passenger_dest))
         return passenger_args
 
     def check_floor(self, location, velocity):
         location = location[0] / FLOOR_HEIGHT
+        round_location = round(location)
         velocity = velocity[0]
-        if 0<=round(location) and round(location)<self.tot_floor:
-            if abs(round(location)-location)<FLOOR_RANGE and abs(velocity)<STOP_VEL_RANGE:
+        if 0<=round_location and round_location<self.tot_floor and abs(round_location-location)<FLOOR_RANGE:
+            if abs(velocity)<STOP_VEL_RANGE:
                 return True, round(location)
-        return False, None
+        else:
+            if abs(velocity)<(STOP_VEL_RANGE/2):
+                self.reward_args["non_stop"] = (STOP_VEL_RANGE/2) - abs(velocity)
+        return False, None 
         
     def on_off_board(self, floor):
         current_arrival = self.passengerEnv.on_off_board(floor)
@@ -196,13 +203,13 @@ class ElevatorEnv(gym.Env):
         
     def compute_reward(self, prev_state, action, next_state):
         self.reward_args["accel_overload"] = self.accel_relu(action)
-        accel_overLoad, current_arrival = self.reward_args.values()
-        reward = STEP_REWARD+(accel_overLoad)*ACCEL_REWARD+(current_arrival)*CURRIVAL_REWARD
+        accel_overLoad, current_arrival, non_stop = self.reward_args.values()
+        reward = (current_arrival)*CURRIVAL_REWARD+(non_stop)*NONSTOP_REWARD
+        #reward = (current_arrival)*CURRIVAL_REWARD
         self.reward_args = {key: 0 for key in self.reward_args}
         return reward
     
     def reset(self, seed=None, options=None):
-        self.T = 0.0
         self.reward=0
         self.done=False
 
@@ -220,8 +227,6 @@ class ElevatorEnv(gym.Env):
         return self.observation,{"info":None}
         
     def step(self, action):
-        self.T+=DELTA_T
-
         if self.passenger_mode=="random_distribution":
             passenger_args=self.random_distribution_passenger_args()
             self.passengerEnv.create(passenger_args)
