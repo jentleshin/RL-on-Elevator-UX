@@ -4,7 +4,6 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 from enum import Enum
-import copy
 
 FLOOR_HEIGHT=3.0
 MAX_VELOCITY=100.0
