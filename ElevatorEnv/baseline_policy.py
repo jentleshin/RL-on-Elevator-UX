@@ -24,17 +24,30 @@ class baseline_policy():
     def action(self,curr_state):
         location=curr_state["location"][0]
         velocity=curr_state["velocity"][0]
+        print("loc: {},vel: {}".format(location,velocity))
         if abs(velocity)<STOP_VEL_RANGE:
             self.moving_direction=MovingState.STOP
         buttons=np.logical_or( curr_state["buttonsOut"],curr_state["buttonsIn"])
         dest=self.add_destination(location,velocity,buttons)
-        if dest is None:
+        if dest is None or not dest:
             return np.array([0.0], dtype=np.float32)
         else:
             distance=abs(location-dest[0]*FLOOR_HEIGHT)
+            print("dist: {:.2f}".format(distance))
+            if abs(velocity)<self.max_accel*DELTA_T:
+                accel=abs(velocity)/DELTA_T
+
+            elif abs(velocity)+self.max_accel*DELTA_T>np.sqrt()
+
+            
+            elif distance<np.square(velocity)/2.0/self.max_accel:
+                print("bb")
+                accel=-self.max_accel
             if distance<abs(velocity)*DELTA_T-0.5*self.max_accel*np.square(DELTA_T):
+                print("aa")
                 accel=(distance-abs(velocity)*DELTA_T)*2.0/np.square(DELTA_T)
             elif distance<np.square(velocity)/2.0/self.max_accel:
+                print("bb")
                 accel=-self.max_accel
             else:
                 accel=self.max_accel
@@ -43,25 +56,32 @@ class baseline_policy():
             accel=accel
         elif self.moving_direction==MovingState.DOWN:
             accel=-accel
+        print("accel: {}".format(accel))
         return np.array([accel], dtype=np.float32)
     
     def add_destination(self,location,velocity,buttons):
+        dest=[]
         if self.moving_direction==MovingState.STOP:
             floor=int(location/FLOOR_HEIGHT)
             self.moving_direction=self.select_direction(floor,buttons)
             if self.moving_direction==MovingState.STOP:
                 return None
-        available_dest=self.available_destination(location,velocity)     
-        dest=[i for i in available_dest 
-                if buttons[i]==1]
+        available_dest=self.available_destination(location,velocity)
+        for i in available_dest:
+            if buttons[i]==True:
+                dest.append(i)
         return dest
     
     def select_direction(self,floor,buttons):
-        for i in range(1,min(floor+1,len(buttons)-floor)):
-            if buttons[floor+i]==1:
-                return MovingState.UP
-            elif buttons[floor-i]==1:
-                return MovingState.DOWN
+        for i in range(0,max(floor+1,len(buttons)-floor)):
+            if floor+i<len(buttons):
+                if buttons[floor+i]==1:
+                    if i==0:
+                        return MovingState.STOP
+                    return MovingState.UP
+            if floor-i>=0:
+                if buttons[floor-i]==1:
+                    return MovingState.DOWN
         return MovingState.STOP
 
     #def destination(self,curr_state):
@@ -69,9 +89,9 @@ class baseline_policy():
     def available_destination(self,location,velocity):
         min_distance=np.square(velocity)/2.0/self.max_accel
         if self.moving_direction==MovingState.UP:
-            return np.arange(np.ceil((location+min_distance)/FLOOR_HEIGHT),self.tot_floor)
+            return np.arange(np.ceil((location+min_distance)/FLOOR_HEIGHT),self.tot_floor,dtype=np.int16)
         elif self.moving_direction==MovingState.DOWN:
-            return np.arange(np.floor((location-min_distance)/FLOOR_HEIGHT),-1)
+            return np.arange(np.floor((location-min_distance)/FLOOR_HEIGHT),-1,-1,dtype=np.int16)
         
 
         

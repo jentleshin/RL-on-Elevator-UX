@@ -93,7 +93,7 @@ if __name__ == "__main__":
     test_parser.add_argument("--filename", type=str, default="recent")
 
     test_parser = subparsers.add_parser("baseline")
-    test_parser.add_argument("--num_episodes", type=int, default=10)
+    test_parser.add_argument("--num_episodes", type=int, default=1)
     test_parser.add_argument("--filename", type=str, default="baseline")
 
 
