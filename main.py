@@ -66,11 +66,13 @@ def main(args):
             output_video.writeFrame(frame)
             counter += 1
             reward+=rew
-            if done:
+            if counter>1000:
                 state,_ = env.reset()
                 num_runs += 1
-                print("Reward: {}",reward)
+                print("Reward: {}".format(reward))
                 reward=0
+                counter=0
+                policy=baseline_policy.baseline_policy()
         print("Successfully saved {} frames into {}!".format(counter, args.filename))
 
 
@@ -93,7 +95,7 @@ if __name__ == "__main__":
     test_parser.add_argument("--filename", type=str, default="recent")
 
     test_parser = subparsers.add_parser("baseline")
-    test_parser.add_argument("--num_episodes", type=int, default=1)
+    test_parser.add_argument("--num_episodes", type=int, default=10)
     test_parser.add_argument("--filename", type=str, default="baseline")
 
 

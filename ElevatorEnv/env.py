@@ -13,7 +13,7 @@ DELTA_T=0.1
 FLOOR_RANGE=0.1
 EDGE_FLOOR_RANGE=1
 STOP_VEL_RANGE=0.1
-ACCEL_THRESHOLD=5
+ACCEL_THRESHOLD=2.0
 
 STEP_REWARD=-0.1
 ACCEL_REWARD=-1
@@ -22,8 +22,8 @@ CURRIVAL_REWARD=10
 WAITING_TIME_REWARD=-0.1
 DELAYED_TIME_REWARD=-0.1
 
-ZERO_FLOOR_DISTRIBUTION_FACTOR=5.0#0.1
-NORMAL_FLOOR_DISTRIBUTION_FACTOR=5.0#0.05
+ZERO_FLOOR_DISTRIBUTION_FACTOR=0.1
+NORMAL_FLOOR_DISTRIBUTION_FACTOR=0.05
 
 class State(Enum):
     WAIT = 0
@@ -55,7 +55,7 @@ class Passenger():
         return np.sqrt(4*distance/ACCEL_THRESHOLD)
 
 class PassengerEnv():
-    def __init__(self, tot_floor, passenger_args=[(2,0,0.0),(1,0,0.0)]):
+    def __init__(self, tot_floor, passenger_args=[(2,0,0.0),(1,0,0.0),(3,0,0.0),(4,0,0.0)]):
         self.passengers=list()
         self.tot_floor = tot_floor
         self.passenger_args = passenger_args
@@ -569,7 +569,7 @@ class ElevatorEnv(BasicElevatorEnv):
         
         self.observation = dict({"buttonsOut":self.passengerEnv.get_buttonsOut(),
                                 "buttonsIn":self.passengerEnv.get_buttonsIn(),
-                                "location": np.array([np.random.randint(self.tot_floor)*FLOOR_HEIGHT], dtype=np.float32),
+                                "location": np.array([0.0], dtype=np.float32),
                                 "velocity": np.array([0.0], dtype=np.float32),
                                 "onFloor": None
                                 })
