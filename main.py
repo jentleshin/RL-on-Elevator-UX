@@ -38,15 +38,25 @@ def main(args):
         output_video = skvideo.io.FFmpegWriter(f"./video/{args.filename}.mp4")
         counter=0
         num_runs=0
+        reward=0
         while num_runs < args.num_episodes:
             action, _ = model.predict(obs)
-            obs, _, done, _ = vec_env.step(action)
+            obs, rew, done, metric = vec_env.step(action)
             frame = vec_env.render()
             output_video.writeFrame(frame)
             counter += 1
-
+            reward+=rew
             if done:
+                print("{}th run".format(num_runs))
+                print("Reward: {}".format(reward))
+                tot_passengers,tot_waiting_time,avg_delayed_time,visited_floors,rms_avg_actions,_,_,_=metric[0].values()
+                print("tot_passengers: {}".format(tot_passengers))
+                print("tot_waiting_time: {}".format(tot_waiting_time))
+                print("avg_delayed_time: {}".format(avg_delayed_time))
+                print("visited_floors: {}".format(visited_floors))
+                print("rms_avg_actions: {}".format(rms_avg_actions))
                 obs = vec_env.reset()
+                reward=0
                 num_runs += 1
 
         print("Successfully saved {} frames into {}!".format(counter, args.filename))
@@ -67,9 +77,12 @@ def main(args):
             counter += 1
             reward+=rew
             if counter>1000:
+                print("{}th run".format(num_runs))
+                print("Reward: {}".format(reward))
+                env.print_metric()
                 state,_ = env.reset()
                 num_runs += 1
-                print("Reward: {}".format(reward))
+                
                 reward=0
                 counter=0
                 policy=baseline_policy.baseline_policy()
@@ -84,7 +97,7 @@ if __name__ == "__main__":
 
     # Subparser for the "train" mode
     train_parser = subparsers.add_parser("train")
-    train_parser.add_argument("--timesteps", type=int, default=1000000)
+    train_parser.add_argument("--timesteps", type=int, default=2000000)
     train_parser.add_argument("--load", type=str, default="None")
     train_parser.add_argument("--checkpoint", type=str, default="recent")
 

@@ -7,7 +7,7 @@ from enum import Enum
 FLOOR_HEIGHT=3.0
 DELTA_T=0.1
 STOP_VEL_RANGE=0.1
-ACCEL_THRESHOLD=2.0
+ACCEL_THRESHOLD=1.0
 FLOOR_RANGE=0.1
 
 class MovingState(Enum):
@@ -47,7 +47,7 @@ class baseline_policy():
             if distance<=0.5*self.max_accel*np.square(DELTA_T):# and distance>=np.square(velocity)/2.0/self.max_accel:
                 accel=-abs(velocity)/DELTA_T
             elif distance<=self.max_accel*np.square(DELTA_T):
-                accel=-abs(velocity)/2.0/DELTA_T              
+                accel=-abs(velocity)/2.0/DELTA_T
             elif distance<(self.max_accel*np.square(DELTA_T)+2*abs(velocity)*DELTA_T+np.square(velocity)/2.0/self.max_accel):
                 #print("{:.2f}".format(self.max_accel*np.square(DELTA_T)+2*abs(velocity)*DELTA_T+np.square(velocity)/2.0/self.max_accel))
                 accel=-self.max_accel
