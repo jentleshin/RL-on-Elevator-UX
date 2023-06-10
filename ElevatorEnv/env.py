@@ -467,14 +467,14 @@ class ElevatorEnv(gym.Env):
         # vel_text_rect.center=(150,100)
         # canvas.blit(vel_text,vel_text_rect)
 
-        action_text=self.font.render("action : "+str(round(self.action,2)),True,(0,0,0))
-        action_text_rect=action_text.get_rect()
-        action_text_rect.center=(150,30)
-        canvas.blit(action_text,action_text_rect)
+        # action_text=self.font.render("action : "+str(round(self.action,2)),True,(0,0,0))
+        # action_text_rect=action_text.get_rect()
+        # action_text_rect.center=(150,30)
+        # canvas.blit(action_text,action_text_rect)
 
-        rew_text=self.font.render("rew : "+str(round(self.cummulative_reward,2)),True,(0,0,0))
+        rew_text=self.font.render("Reward : "+str(round(self.cummulative_reward,2)),True,(0,0,0))
         rew_text_rect=rew_text.get_rect()
-        rew_text_rect.center=(800,30)
+        rew_text_rect.center=(740,30)
         canvas.blit(rew_text,rew_text_rect)
 
         
