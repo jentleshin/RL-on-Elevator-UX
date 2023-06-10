@@ -468,7 +468,7 @@ class ElevatorEnv(gym.Env):
 
         action_text=self.font.render("action : "+str(round(self.action,2)),True,(0,0,0))
         action_text_rect=action_text.get_rect()
-        action_text_rect.center=(150,160)
+        action_text_rect.center=(150,30)
         canvas.blit(action_text,action_text_rect)
 
         rew_text=self.font.render("rew : "+str(round(self.cummulative_reward,2)),True,(0,0,0))
@@ -704,8 +704,8 @@ class ButtonElevatorEnv(gym.Env):
     
     def _init_render(self):
         pygame.font.init()
-        self.font=pygame.font.Font('freesansbold.ttf',40)
-        self.numfont=pygame.font.Font('freesansbold.ttf',30)
+        self.font=pygame.font.Font('freesansbold.ttf',30)
+        #self.numfont=pygame.font.Font('freesansbold.ttf',30)
 
         """
         If human-rendering is used, `self.window` will be a reference
@@ -724,7 +724,11 @@ class ButtonElevatorEnv(gym.Env):
             return self._render_frame()
 
     def _render_frame(self):
-        color=[(0,0,0),(0,255,0)]
+        black=(0,0,0)
+        gray=(224,224,224)
+        white=(255,255,255)
+        color=[(255,184,0),(255,0,138),(82,0,255),(0,240,255),(173,255,0)]
+        buttons=[black,(0,255,0)]
 
         if self.window is None and self.render_mode == "human":
             pygame.init()
@@ -734,7 +738,7 @@ class ButtonElevatorEnv(gym.Env):
             self.clock = pygame.time.Clock()
 
         canvas = pygame.Surface((self.window_size, self.window_size))
-        canvas.fill((255, 255, 255))
+        canvas.fill(white)
         pix_square_size = (
             self.window_size / self.tot_floor
         )  # The size of a single grid square in pixels
@@ -748,7 +752,7 @@ class ButtonElevatorEnv(gym.Env):
         for i in range(self.tot_floor):
             pygame.draw.rect(
                 canvas,
-                (0,0,255),
+                color[i],
                 pygame.Rect(
                     (self.window_size/2-(elevator_width+2*borderLine_thickness)/2,(i+0.5)*pix_square_size-(elevator_height+2*borderLine_thickness)/2),
                     (elevator_width+2*borderLine_thickness,elevator_height+2*borderLine_thickness)
@@ -763,14 +767,14 @@ class ButtonElevatorEnv(gym.Env):
             if i!=self.tot_floor-1:
                 pygame.draw.line(
                     canvas,
-                    (0, 0, 255),
+                    gray,
                     (self.window_size/2,(i+0.5)*pix_square_size),
                     (self.window_size/2,(i+1.5)*pix_square_size),
                     width=10,
                 )
             pygame.draw.rect(
                 canvas,
-                (255,255,255),
+                white,
                 pygame.Rect(
                     (self.window_size/2-elevator_width/2,(i+0.5)*pix_square_size-elevator_height/2),
                     (elevator_width,elevator_height)
@@ -785,20 +789,20 @@ class ButtonElevatorEnv(gym.Env):
             # )
             pygame.draw.circle(
                 canvas,
-                color[bool(self.observation['buttonsIn'][i])],
+                buttons[bool(self.observation['buttonsIn'][i])],
                 (self.window_size -100,self.window_size-(i+0.5)*pix_square_size),
                 20,
             )
             pygame.draw.circle(
                 canvas,
-                color[bool(self.observation['buttonsOut'][i])],
+                buttons[bool(self.observation['buttonsOut'][i])],
                 (100,self.window_size-(i+0.5)*pix_square_size),
                 20,
             )
 
         pygame.draw.rect(
             canvas,
-            (255, 0, 0),
+            black,
             pygame.Rect(
                 (self.window_size/2-elevator_width/2,self.window_size-pix_square_size/2-self.observation['location'][0]/FLOOR_HEIGHT*floor_pixel_size-elevator_height/2),
                 (elevator_width, elevator_height),
@@ -812,46 +816,46 @@ class ButtonElevatorEnv(gym.Env):
             if self.passengerEnv.passengers[i].state is State.ARRIVAL:
                 pygame.draw.circle(
                     canvas,
-                    (255, 0, 0),
+                    color[self.passengerEnv.passengers[i].dest],
                     (self.window_size/2 +100 + 50*num_arrived[self.passengerEnv.passengers[i].dest] ,self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size),
                     20,
                 )
-                origin_text=self.numfont.render(str(self.passengerEnv.passengers[i].origin) ,True,(255,255,255))
-                origin_text_rect=origin_text.get_rect()
-                origin_text_rect.center=(self.window_size/2 +100 + 50*num_arrived[self.passengerEnv.passengers[i].dest],self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size )
-                canvas.blit(origin_text,origin_text_rect)
+                # origin_text=self.numfont.render(str(self.passengerEnv.passengers[i].origin) ,True,(255,255,255))
+                # origin_text_rect=origin_text.get_rect()
+                # origin_text_rect.center=(self.window_size/2 +100 + 50*num_arrived[self.passengerEnv.passengers[i].dest],self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size )
+                # canvas.blit(origin_text,origin_text_rect)
                 num_arrived[self.passengerEnv.passengers[i].dest]+=1
             elif self.passengerEnv.passengers[i].state is State.WAIT:
                 pygame.draw.circle(
                     canvas,
-                    (0, 0, 255),
+                    color[self.passengerEnv.passengers[i].dest],
                     (self.window_size/2 -100- 50*num_waiting[self.passengerEnv.passengers[i].origin] ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size ),
                     20,
                 )
-                dest_text=self.numfont.render(str(self.passengerEnv.passengers[i].dest),True,(255,255,255))
-                dest_text_rect=dest_text.get_rect()
-                dest_text_rect.center=(self.window_size/2 -100 -50*num_waiting[self.passengerEnv.passengers[i].origin] ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size )
-                canvas.blit(dest_text,dest_text_rect)
+                # dest_text=self.numfont.render(str(self.passengerEnv.passengers[i].dest),True,(255,255,255))
+                # dest_text_rect=dest_text.get_rect()
+                # dest_text_rect.center=(self.window_size/2 -100 -50*num_waiting[self.passengerEnv.passengers[i].origin] ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size )
+                # canvas.blit(dest_text,dest_text_rect)
                 num_waiting[self.passengerEnv.passengers[i].origin]+=1
 
-        loc_text=self.font.render("loc(m): "+str(round(self.observation['location'][0],2)),True,(0,0,0))
-        loc_text_rect=loc_text.get_rect()
-        loc_text_rect.center=(150,40)
-        canvas.blit(loc_text,loc_text_rect)
+        # loc_text=self.font.render("loc(m): "+str(round(self.observation['location'][0],2)),True,(0,0,0))
+        # loc_text_rect=loc_text.get_rect()
+        # loc_text_rect.center=(150,40)
+        # canvas.blit(loc_text,loc_text_rect)
 
-        vel_text=self.font.render("vel(m/s) : "+str(round(self.observation['velocity'][0],2)),True,(0,0,0))
-        vel_text_rect=vel_text.get_rect()
-        vel_text_rect.center=(150,100)
-        canvas.blit(vel_text,vel_text_rect)
+        # vel_text=self.font.render("vel(m/s) : "+str(round(self.observation['velocity'][0],2)),True,(0,0,0))
+        # vel_text_rect=vel_text.get_rect()
+        # vel_text_rect.center=(150,100)
+        # canvas.blit(vel_text,vel_text_rect)
 
         action_text=self.font.render("action : "+str(round(self.action,2)),True,(0,0,0))
         action_text_rect=action_text.get_rect()
-        action_text_rect.center=(150,160)
+        action_text_rect.center=(150,30)
         canvas.blit(action_text,action_text_rect)
 
         rew_text=self.font.render("rew : "+str(round(self.cummulative_reward,2)),True,(0,0,0))
         rew_text_rect=rew_text.get_rect()
-        rew_text_rect.center=(800,40)
+        rew_text_rect.center=(800,30)
         canvas.blit(rew_text,rew_text_rect)
 
         
