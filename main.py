@@ -14,6 +14,7 @@ def main(args):
     
     if args.mode == "train":
         vec_env = make_vec_env('Elevator-v0', n_envs=8)
+        #vec_env = make_vec_env('Elevator-v1', n_envs=8)
         if args.load == "None":
             model = PPO('MultiInputPolicy', vec_env, verbose=1)
         else:
@@ -33,6 +34,7 @@ def main(args):
 
         model = PPO.load(f"./checkpoint/{args.checkpoint}")
         vec_env = make_vec_env('Elevator-v0', n_envs=1)
+        #vec_env = make_vec_env('Elevator-v1', n_envs=1)
         obs = vec_env.reset()
 
         output_video = skvideo.io.FFmpegWriter(f"./video/{args.filename}.mp4")
@@ -97,7 +99,7 @@ if __name__ == "__main__":
 
     # Subparser for the "train" mode
     train_parser = subparsers.add_parser("train")
-    train_parser.add_argument("--timesteps", type=int, default=2000000)
+    train_parser.add_argument("--timesteps", type=int, default=10000000)
     train_parser.add_argument("--load", type=str, default="None")
     train_parser.add_argument("--checkpoint", type=str, default="recent")
 

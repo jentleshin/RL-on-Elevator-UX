@@ -9,3 +9,9 @@ register(
     max_episode_steps=MAX_EPISODE_STEP,
     reward_threshold=REWARD_THRESHOLD
 )
+register(
+    id='Elevator-v1',
+    entry_point='ElevatorEnv.env:ButtonElevatorEnv',
+    max_episode_steps=MAX_EPISODE_STEP,
+    reward_threshold=REWARD_THRESHOLD
+)
