@@ -13,7 +13,7 @@ DELTA_T=0.1
 FLOOR_RANGE=0.1
 EDGE_FLOOR_RANGE=1
 STOP_VEL_RANGE=0.1
-ACCEL_THRESHOLD=0.5
+ACCEL_THRESHOLD=1.0
 
 STEP_REWARD=-0.1
 ACCEL_REWARD=-1
@@ -346,7 +346,7 @@ class ElevatorEnv(gym.Env):
         gray=(224,224,224)
         white=(255,255,255)
         color=[(255,184,0),(255,0,138),(82,0,255),(0,240,255),(173,255,0)]
-        buttons=[black,(0,255,0)]
+        buttons=[white,black]
 
         if self.window is None and self.render_mode == "human":
             pygame.init()
@@ -368,9 +368,17 @@ class ElevatorEnv(gym.Env):
 
         # First we draw the target
         for i in range(self.tot_floor):
+            if i!=self.tot_floor-1:
+                pygame.draw.line(
+                    canvas,
+                    gray,
+                    (self.window_size/2,(i+0.5)*pix_square_size),
+                    (self.window_size/2,(i+1.5)*pix_square_size),
+                    width=10,
+                )
             pygame.draw.rect(
                 canvas,
-                color[i],
+                color[self.tot_floor-i-1],
                 pygame.Rect(
                     (self.window_size/2-(elevator_width+2*borderLine_thickness)/2,(i+0.5)*pix_square_size-(elevator_height+2*borderLine_thickness)/2),
                     (elevator_width+2*borderLine_thickness,elevator_height+2*borderLine_thickness)
@@ -382,14 +390,7 @@ class ElevatorEnv(gym.Env):
             #     (self.window_size/2,(i+0.5)*pix_square_size),
             #     40,
             # )
-            if i!=self.tot_floor-1:
-                pygame.draw.line(
-                    canvas,
-                    gray,
-                    (self.window_size/2,(i+0.5)*pix_square_size),
-                    (self.window_size/2,(i+1.5)*pix_square_size),
-                    width=10,
-                )
+            
             pygame.draw.rect(
                 canvas,
                 white,
@@ -408,13 +409,13 @@ class ElevatorEnv(gym.Env):
             pygame.draw.circle(
                 canvas,
                 buttons[self.observation['buttonsIn'][i]],
-                (self.window_size -100,self.window_size-(i+0.5)*pix_square_size),
+                (self.window_size -60,self.window_size-(i+0.5)*pix_square_size),
                 20,
             )
             pygame.draw.circle(
                 canvas,
                 buttons[self.observation['buttonsOut'][i]],
-                (100,self.window_size-(i+0.5)*pix_square_size),
+                (60,self.window_size-(i+0.5)*pix_square_size),
                 20,
             )
 
@@ -435,8 +436,8 @@ class ElevatorEnv(gym.Env):
                 pygame.draw.circle(
                     canvas,
                     color[self.passengerEnv.passengers[i].dest],
-                    (self.window_size/2 +100 + 50*num_arrived[self.passengerEnv.passengers[i].dest] ,self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size),
-                    20,
+                    (self.window_size/2 +80 + 40*min(6, num_arrived[self.passengerEnv.passengers[i].dest]) ,self.window_size-(self.passengerEnv.passengers[i].dest+0.5)*pix_square_size),
+                    15,
                 )
                 # origin_text=self.numfont.render(str(self.passengerEnv.passengers[i].origin) ,True,(255,255,255))
                 # origin_text_rect=origin_text.get_rect()
@@ -447,8 +448,8 @@ class ElevatorEnv(gym.Env):
                 pygame.draw.circle(
                     canvas,
                     color[self.passengerEnv.passengers[i].dest],
-                    (self.window_size/2 -100- 50*num_waiting[self.passengerEnv.passengers[i].origin] ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size ),
-                    20,
+                    (self.window_size/2 -80- 40*min(6, num_waiting[self.passengerEnv.passengers[i].origin]) ,self.window_size-(self.passengerEnv.passengers[i].origin+0.5)*pix_square_size ),
+                    15,
                 )
                 # dest_text=self.numfont.render(str(self.passengerEnv.passengers[i].dest),True,(255,255,255))
                 # dest_text_rect=dest_text.get_rect()
@@ -466,14 +467,14 @@ class ElevatorEnv(gym.Env):
         # vel_text_rect.center=(150,100)
         # canvas.blit(vel_text,vel_text_rect)
 
-        action_text=self.font.render("action : "+str(round(self.action,2)),True,(0,0,0))
-        action_text_rect=action_text.get_rect()
-        action_text_rect.center=(150,30)
-        canvas.blit(action_text,action_text_rect)
+        # action_text=self.font.render("action : "+str(round(self.action,2)),True,(0,0,0))
+        # action_text_rect=action_text.get_rect()
+        # action_text_rect.center=(150,30)
+        # canvas.blit(action_text,action_text_rect)
 
-        rew_text=self.font.render("rew : "+str(round(self.cummulative_reward,2)),True,(0,0,0))
+        rew_text=self.font.render("Reward : "+str(round(self.cummulative_reward,2)),True,(0,0,0))
         rew_text_rect=rew_text.get_rect()
-        rew_text_rect.center=(800,30)
+        rew_text_rect.center=(740,30)
         canvas.blit(rew_text,rew_text_rect)
 
         

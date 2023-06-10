@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 def main(args):
     
     if args.mode == "train":
-        if args.model=="normal":
+        if args.buttonState=="normal":
             vec_env = make_vec_env('Elevator-v0', n_envs=8)
-        elif args.model=="buttons":
+        elif args.buttonState=="passengerNums":
             vec_env = make_vec_env('Elevator-v1', n_envs=8)
         if args.load == "None":
             model = PPO('MultiInputPolicy', vec_env, verbose=1)
@@ -35,9 +35,9 @@ def main(args):
 
 
         model = PPO.load(f"./checkpoint/{args.checkpoint}")
-        if args.model=="normal":
+        if args.buttonState=="normal":
             vec_env = make_vec_env('Elevator-v0', n_envs=1)
-        elif args.model=="buttons":
+        elif args.buttonState=="passengerNums":
             vec_env = make_vec_env('Elevator-v1', n_envs=1)
 
         obs = vec_env.reset()
@@ -97,7 +97,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    models=["normal","buttons"]
+    models=["normal","passengerNums"]
     parser = argparse.ArgumentParser()
 
     subparsers = parser.add_subparsers(dest="mode")
@@ -107,14 +107,14 @@ if __name__ == "__main__":
     train_parser.add_argument("--timesteps", type=int, default=10000000)
     train_parser.add_argument("--load", type=str, default="None")
     train_parser.add_argument("--checkpoint", type=str, default="recent")
-    train_parser.add_argument("--model", type=str, default="normal")
+    train_parser.add_argument("--buttonState", type=str, default="normal")
 
     # Subparser for the "test" mode
     test_parser = subparsers.add_parser("test")
     test_parser.add_argument("--num_episodes", type=int, default=10)
     test_parser.add_argument("--checkpoint", type=str, default="recent")
     test_parser.add_argument("--filename", type=str, default="recent")
-    train_parser.add_argument("--model", type=str, default="normal")
+    test_parser.add_argument("--buttonState", type=str, default="normal")
 
     test_parser = subparsers.add_parser("baseline")
     test_parser.add_argument("--num_episodes", type=int, default=10)
