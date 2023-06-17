@@ -1,8 +1,8 @@
 # RL-on-Elevator-UX
 Elevator UX Improvement with RL
 
-# Installation Guide
-## Using Python Venv
+## Installation Guide
+### Using Python Venv
 
 Clone repo and install [requirements.txt](https://github.com/jentleshin/RL-on-Elevator-UX/blob/main/requirements.txt) in a
 [**Python>=3.7.0**](https://www.python.org/) environment, including
@@ -10,7 +10,7 @@ Clone repo and install [requirements.txt](https://github.com/jentleshin/RL-on-El
 
 Follow the steps below in order to reproduce our results.
 
-### 1. Clone repo
+1. Clone repo
 
 ```bash
 git clone https://github.com/jentleshin/RL-on-Elevator-UX.git  # clone
@@ -18,7 +18,7 @@ cd RL-on-Elevator-UX
 python -m venv "your_venv_name"
 source ./venv/bin/activate
 ```
-### 2. Install Pytorch
+2. Install Pytorch
 
 Install <a href="https://pytorch.org/get-started/previous-versions/">Pytorch</a> that matches your CUDA version
 
@@ -26,13 +26,13 @@ Pytorch with CUDA 11.5 used:
 ```bash
 pip install torch==1.11.0+cu115 torchvision==0.12.0+cu115 torchaudio==0.11.0+cu115 --extra-index-url https://download.pytorch.org/whl/cu115
 ```
-### 3. Install Requirements
+3. Install Requirements
 
 ```bash
 pip install -r requirements.txt  # install
 ```
-
-# Training 
+## Run
+### Training 
 
 ```bash
 python main.py train
@@ -46,7 +46,7 @@ python main.py train --load previous_checkpoint #default=recent
 python main.py train --buttonState passengerNums #default=normal
 ```
 
-# Testing trained results
+### Testing trained results
 
 ```bash
 python main.py test 
@@ -62,7 +62,7 @@ python main.py test --filename results #default=recent
 python main.py test --buttonState passengerNums #default=normal
 ```
 
-# Testing Baseline Policy
+### Testing Baseline Policy
 
 ```bash
 python main.py baseline
