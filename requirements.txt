@@ -1,0 +1,5 @@
+gymnasium==0.28.1
+numpy==1.24.3
+pygame==2.4.0
+sk-video==1.1.10
+"stable_baselines3[extra]>=2.0.0a9"
