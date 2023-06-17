@@ -92,6 +92,9 @@ class PassengerEnv():
 
     def on_off_board(self,floor,T):
         tot_delayed_time=0.0
+        floor_visited=0
+        if len(self.waiting[floor])!=0 or len(self.onboarding[floor])!=0:
+            floor_visited=1
         for passenger in self.waiting[floor]:
             passenger.state = State.ONBOARD
             passenger.onboarding_time = T
@@ -104,7 +107,7 @@ class PassengerEnv():
             tot_delayed_time+=(T-passenger.onboarding_time)-passenger.expected_arrival_time
             self.arrived[floor].append(passenger)
         self.onboarding[floor]=[]
-        return current_arrival, tot_delayed_time
+        return current_arrival, tot_delayed_time, floor_visited
     
     def all_arrived(self):
         return all(passenger.state==State.ARRIVAL for passenger in self.passengers)
@@ -217,7 +220,6 @@ class ElevatorEnv(gym.Env):
         velocity = velocity[0]
         if 0<=round_location and round_location<self.tot_floor and abs(round_location-location)<FLOOR_RANGE:
             on_floor = 1
-            self.metric_args["visited_floors"]+=1
             if abs(velocity)<STOP_VEL_RANGE:
                 return on_floor, True, round(location)
         else:
@@ -227,7 +229,8 @@ class ElevatorEnv(gym.Env):
         return on_floor, False, None 
         
     def on_off_board(self, floor):
-        current_arrival , tot_delayed_time= self.passengerEnv.on_off_board(floor,self.T)
+        current_arrival , tot_delayed_time,floor_visited= self.passengerEnv.on_off_board(floor,self.T)
+        self.metric_args["visited_floors"]+=floor_visited
         self.reward_args["current_arrival"] = current_arrival
         self.reward_args["tot_delayed_time"]=tot_delayed_time
         if current_arrival!=0:
