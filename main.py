@@ -42,7 +42,7 @@ def main(args):
 
         obs = vec_env.reset()
 
-        output_video = skvideo.io.FFmpegWriter(f"./video/{args.filename}.mp4")
+        output_video = skvideo.io.FFmpegWriter(f"./videos/{args.filename}.mp4")
         counter=0
         num_runs=0
         reward=0
@@ -72,7 +72,7 @@ def main(args):
         env=gym.make('Elevator-v0')
         state,_=env.reset()
         policy=baseline_policy.baseline_policy()
-        output_video = skvideo.io.FFmpegWriter(f"./video/{args.filename}.mp4")
+        output_video = skvideo.io.FFmpegWriter(f"./videos/{args.filename}.mp4")
         counter=0
         num_runs=0
         reward=0
