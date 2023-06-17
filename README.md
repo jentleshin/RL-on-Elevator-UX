@@ -3,18 +3,30 @@ Elevator UX Improvement with RL
 
 # Installation Guide
 ## Using Python Venv
+
+Clone repo and install [requirements.txt](https://github.com/jentleshin/RL-on-Elevator-UX/blob/main/requirements.txt) in a
+[**Python>=3.7.0**](https://www.python.org/) environment, including
+[**PyTorch>=1.7**](https://pytorch.org/get-started/locally/).
+
+Follow the steps below in order to reproduce our results.
+
+### 1. Clone repo
+
 ```bash
 git clone https://github.com/jentleshin/RL-on-Elevator-UX.git  # clone
 cd RL-on-Elevator-UX
 python -m venv "your_venv_name"
 source ./venv/bin/activate
 ```
+### 2. Install Pytorch
+
 Install <a href="https://pytorch.org/get-started/previous-versions/">Pytorch</a> that matches your CUDA version
 
-Pytorch used:
+Pytorch with CUDA 11.5 used:
 ```bash
 pip install torch==1.11.0+cu115 torchvision==0.12.0+cu115 torchaudio==0.11.0+cu115 --extra-index-url https://download.pytorch.org/whl/cu115
 ```
+### 3. Install Requirements
 
 ```bash
 pip install -r requirements.txt  # install
