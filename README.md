@@ -7,6 +7,7 @@ Elevator UX Improvement with RL
 Clone repo and install [requirements.txt](https://github.com/jentleshin/RL-on-Elevator-UX/blob/main/requirements.txt) in a
 [**Python>=3.7.0**](https://www.python.org/) environment, including
 [**PyTorch>=1.7**](https://pytorch.org/get-started/locally/).
+
 Python 3.10.9 with PyTorch 1.11.0 used for training and testing.
 
 Follow the steps below in order to reproduce our results.
